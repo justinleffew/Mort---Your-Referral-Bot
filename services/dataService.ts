@@ -215,15 +215,83 @@ export const dataService = {
   },
   
   bulkImport: (rows: any[]) => {
-    rows.forEach(row => {
-        dataService.addContact({
-            full_name: row['Name'] || row['Full Name'] || row['name'] || 'Unknown',
-            phone: row['Phone'] || row['phone'] || row['Mobile'] || '',
-            email: row['Email'] || row['email'] || '',
-            sale_date: row['Sale Date'] || row['Closing Date'] || undefined,
-            last_contacted_at: row['Last Contacted'] || undefined,
-        });
+    const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
+    const normalizeName = (value: string) => value.trim();
+    const normalizeEmail = (value: string) => value.trim().toLowerCase();
+    const normalizePhone = (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      const digits = trimmed.replace(/\D/g, '');
+      return trimmed.startsWith('+') ? `+${digits}` : digits;
+    };
+    const contactsByEmail = new Map<string, Contact>();
+    const contactsByPhone = new Map<string, Contact>();
+
+    contacts.forEach(contact => {
+      const normalizedEmail = normalizeEmail(contact.email || '');
+      const normalizedPhone = normalizePhone(contact.phone || '');
+      if (normalizedEmail) {
+        contactsByEmail.set(normalizedEmail, contact);
+      }
+      if (normalizedPhone) {
+        contactsByPhone.set(normalizedPhone, contact);
+      }
     });
+
+    let added = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    rows.forEach(row => {
+      const rawName = row['Name'] || row['Full Name'] || row['name'] || '';
+      const rawPhone = row['Phone'] || row['phone'] || row['Mobile'] || '';
+      const rawEmail = row['Email'] || row['email'] || '';
+
+      const full_name = rawName ? normalizeName(rawName) : 'Unknown';
+      const phone = rawPhone ? normalizePhone(rawPhone) : '';
+      const email = rawEmail ? normalizeEmail(rawEmail) : '';
+      const sale_date = row['Sale Date'] || row['Closing Date'] || undefined;
+      const last_contacted_at = row['Last Contacted'] || undefined;
+
+      const existing = (email && contactsByEmail.get(email)) || (phone && contactsByPhone.get(phone));
+
+      if (existing) {
+        const nextData: Partial<Contact> = {
+          full_name,
+          phone: phone || existing.phone,
+          email: email || existing.email,
+          sale_date: sale_date ?? existing.sale_date,
+          last_contacted_at: last_contacted_at ?? existing.last_contacted_at,
+        };
+        const hasChanges = Object.entries(nextData).some(([key, value]) => {
+          return value !== undefined && (existing as any)[key] !== value;
+        });
+
+        if (hasChanges) {
+          dataService.updateContact(existing.id, nextData);
+          const updatedContact = { ...existing, ...nextData };
+          if (email) contactsByEmail.set(email, updatedContact);
+          if (phone) contactsByPhone.set(phone, updatedContact);
+          updated += 1;
+        } else {
+          skipped += 1;
+        }
+        return;
+      }
+
+      const newContact = dataService.addContact({
+        full_name,
+        phone,
+        email,
+        sale_date,
+        last_contacted_at,
+      });
+      if (email) contactsByEmail.set(email, newContact);
+      if (phone) contactsByPhone.set(phone, newContact);
+      added += 1;
+    });
+
+    return { added, updated, skipped };
   },
 
   getStats: () => {
