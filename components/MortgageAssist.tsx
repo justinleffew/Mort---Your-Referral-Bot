@@ -20,6 +20,8 @@ const MortgageAssist: React.FC = () => {
     const sessionRef = useRef<any>(null);
     const nextStartTimeRef = useRef<number>(0);
     const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+    const workletNodeRef = useRef<AudioWorkletNode | null>(null);
+    const workletModuleUrlRef = useRef<string | null>(null);
 
     // Clean up on unmount
     useEffect(() => {
@@ -44,6 +46,17 @@ const MortgageAssist: React.FC = () => {
         // Close session
         if (sessionRef.current) {
              sessionRef.current = null;
+        }
+
+        if (workletNodeRef.current) {
+            workletNodeRef.current.port.onmessage = null;
+            workletNodeRef.current.disconnect();
+            workletNodeRef.current = null;
+        }
+
+        if (workletModuleUrlRef.current) {
+            URL.revokeObjectURL(workletModuleUrlRef.current);
+            workletModuleUrlRef.current = null;
         }
 
         // Stop input
@@ -80,6 +93,10 @@ const MortgageAssist: React.FC = () => {
             outputAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
             nextStartTimeRef.current = 0;
 
+            const workletUrl = createPcmWorkletModuleUrl();
+            workletModuleUrlRef.current = workletUrl;
+            await inputAudioContextRef.current.audioWorklet.addModule(workletUrl);
+
             // Get Mic Stream
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
@@ -104,12 +121,14 @@ const MortgageAssist: React.FC = () => {
                         // Start Input Streaming
                         if (!inputAudioContextRef.current) return;
                         const source = inputAudioContextRef.current.createMediaStreamSource(stream);
-                        const scriptProcessor = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
-                        
-                        scriptProcessor.onaudioprocess = (e) => {
-                            const inputData = e.inputBuffer.getChannelData(0);
-                            const pcmData = encodePCM(inputData);
-                            
+                        const workletNode = new AudioWorkletNode(
+                            inputAudioContextRef.current,
+                            'pcm16k-processor',
+                        );
+                        workletNodeRef.current = workletNode;
+                        workletNode.port.onmessage = (event) => {
+                            const pcmData = encodePcm16Buffer(event.data as ArrayBuffer);
+
                             sessionPromise.then((session) => {
                                 session.sendRealtimeInput({
                                     media: {
@@ -120,8 +139,8 @@ const MortgageAssist: React.FC = () => {
                             });
                         };
 
-                        source.connect(scriptProcessor);
-                        scriptProcessor.connect(inputAudioContextRef.current.destination);
+                        source.connect(workletNode);
+                        workletNode.connect(inputAudioContextRef.current.destination);
                     },
                     onmessage: async (message: LiveServerMessage) => {
                          // Handle Audio Output
@@ -300,6 +319,35 @@ const Section = ({ title, content, color, italic }: any) => {
 
 // --- Audio Utils ---
 
+function createPcmWorkletModuleUrl(): string {
+    const workletSource = `
+        class Pcm16kProcessor extends AudioWorkletProcessor {
+            process(inputs, outputs) {
+                const input = inputs[0];
+                const output = outputs[0];
+                if (output && output[0]) {
+                    output[0].fill(0);
+                }
+                if (!input || !input[0]) {
+                    return true;
+                }
+                const channel = input[0];
+                const int16 = new Int16Array(channel.length);
+                for (let i = 0; i < channel.length; i++) {
+                    const sample = Math.max(-1, Math.min(1, channel[i]));
+                    int16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+                }
+                this.port.postMessage(int16.buffer, [int16.buffer]);
+                return true;
+            }
+        }
+        registerProcessor('pcm16k-processor', Pcm16kProcessor);
+    `;
+
+    const blob = new Blob([workletSource], { type: 'application/javascript' });
+    return URL.createObjectURL(blob);
+}
+
 function decodeBase64(base64: string) {
     const binaryString = atob(base64);
     const len = binaryString.length;
@@ -310,18 +358,9 @@ function decodeBase64(base64: string) {
     return bytes;
 }
 
-function encodePCM(inputData: Float32Array): string {
-    const l = inputData.length;
-    const int16 = new Int16Array(l);
-    for (let i = 0; i < l; i++) {
-        // Clamp and convert float (-1.0 to 1.0) to int16
-        const s = Math.max(-1, Math.min(1, inputData[i]));
-        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-    }
-    
-    // Convert ArrayBuffer to binary string
+function encodePcm16Buffer(buffer: ArrayBuffer): string {
     let binary = '';
-    const bytes = new Uint8Array(int16.buffer);
+    const bytes = new Uint8Array(buffer);
     const len = bytes.byteLength;
     for (let i = 0; i < len; i++) {
         binary += String.fromCharCode(bytes[i]);
