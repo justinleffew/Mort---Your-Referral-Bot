@@ -11,14 +11,52 @@ const STORAGE_KEYS = {
 
 const MOCK_USER_ID = 'user_123';
 
-const save = (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data));
+const STORAGE_VERSION = 'v1';
+
+type VersionedPayload<T> = {
+  version: string;
+  data: T;
+};
+
+const save = (key: string, data: any) => {
+  const payload: VersionedPayload<any> = { version: STORAGE_VERSION, data };
+  localStorage.setItem(key, JSON.stringify(payload));
+};
 const load = <T>(key: string): T[] => {
   const str = localStorage.getItem(key);
-  return str ? JSON.parse(str) : [];
+  if (!str) return [];
+  try {
+    const parsed = JSON.parse(str) as VersionedPayload<T[]> | T[];
+    if (typeof parsed === 'object' && parsed !== null && 'version' in parsed) {
+      if ((parsed as VersionedPayload<T[]>).version !== STORAGE_VERSION) {
+        console.warn(`Storage version mismatch for key "${key}", clearing data.`);
+        return [];
+      }
+      return (parsed as VersionedPayload<T[]>).data ?? [];
+    }
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn(`Failed to parse storage data for key "${key}".`, error);
+    return [];
+  }
 };
 const loadObject = <T>(key: string): T | null => {
   const str = localStorage.getItem(key);
-  return str ? JSON.parse(str) : null;
+  if (!str) return null;
+  try {
+    const parsed = JSON.parse(str) as VersionedPayload<T> | T;
+    if (typeof parsed === 'object' && parsed !== null && 'version' in parsed) {
+      if ((parsed as VersionedPayload<T>).version !== STORAGE_VERSION) {
+        console.warn(`Storage version mismatch for key "${key}", clearing data.`);
+        return null;
+      }
+      return (parsed as VersionedPayload<T>).data ?? null;
+    }
+    return parsed ?? null;
+  } catch (error) {
+    console.warn(`Failed to parse storage data for key "${key}".`, error);
+    return null;
+  }
 };
 const uuid = () => crypto.randomUUID();
 
