@@ -124,7 +124,15 @@ export const dataService = {
     const states = load<RadarState>(STORAGE_KEYS.RADAR);
     const index = states.findIndex(r => r.contact_id === contactId);
     if (index !== -1) {
-      states[index] = { ...states[index], ...data };
+      const existing = states[index];
+      const mergedAngles = data.angles_used_json
+        ? [...(existing.angles_used_json || []), ...data.angles_used_json].slice(-10)
+        : existing.angles_used_json;
+      states[index] = {
+        ...existing,
+        ...data,
+        angles_used_json: mergedAngles,
+      };
       save(STORAGE_KEYS.RADAR, states);
     }
   },

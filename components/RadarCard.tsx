@@ -36,14 +36,18 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
         setEditedMessage(result.message);
         setLoading(false);
 
-        if (!forceRefresh) {
-            dataService.updateRadarState(contact.id, {
-                last_prompt_shown_at: new Date().toISOString(),
-                last_angle: angle,
-                last_reason: result.reason,
-                last_message: result.message
-            });
-        }
+        const usedAt = new Date().toISOString();
+        dataService.updateRadarState(contact.id, {
+            angles_used_json: [{ angle, used_at: usedAt }],
+            ...(forceRefresh
+                ? {}
+                : {
+                    last_prompt_shown_at: usedAt,
+                    last_angle: angle,
+                    last_reason: result.reason,
+                    last_message: result.message
+                })
+        });
     };
 
     const handleCopy = () => {
