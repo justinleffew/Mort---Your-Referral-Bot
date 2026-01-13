@@ -1,0 +1,7 @@
+{
+  "name": "Mort V1",
+  "description": "A rules-first relationship radar and mortgage assistant for solo real estate agents.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

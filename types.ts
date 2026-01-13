@@ -1,0 +1,91 @@
+
+export type ComfortLevel = 'yes' | 'maybe' | 'not_now';
+
+export interface MortgageInference {
+  likely_rate_environment: string;
+  opportunity_tag: string;
+  reasoning: string;
+}
+
+export interface FamilyDetails {
+  children: string[];
+  pets: string[];
+}
+
+export interface Contact {
+  id: string;
+  user_id: string;
+  full_name: string;
+  phone?: string;
+  email?: string;
+  location_context?: string;
+  sale_date?: string; // ISO date string
+  last_contacted_at?: string; // ISO date string
+  comfort_level: ComfortLevel;
+  archived: boolean;
+  created_at: string;
+  // New Rich Fields
+  radar_interests: string[];
+  family_details: FamilyDetails;
+  mortgage_inference?: MortgageInference;
+  suggested_action?: string;
+}
+
+export interface ContactNote {
+  id: string;
+  contact_id: string;
+  user_id: string;
+  note_text: string;
+  created_at: string;
+}
+
+export interface RadarState {
+  id: string;
+  contact_id: string;
+  user_id: string;
+  reached_out: boolean;
+  reached_out_at?: string;
+  suppressed_until?: string; // ISO date string (YYYY-MM-DD)
+  last_prompt_shown_at?: string;
+  angles_used_json: Array<{ angle: string; used_at: string }>;
+  last_angle?: string;
+  last_reason?: string;
+  last_message?: string;
+  last_refreshed_at?: string;
+}
+
+export interface MortgageQueryResponse {
+  buyer_script: string;
+  ballpark_numbers: string;
+  heads_up: string;
+  next_steps: string;
+}
+
+export interface RealtorProfile {
+  name: string;
+  headshot?: string; // base64
+}
+
+export type RadarAngle = 'friendly_checkin' | 'interest_based' | 'time_since_contact' | 'homeownership_milestone' | 'light_value_framing' | 'equity_opportunity';
+
+export interface GeneratedMessage {
+  message: string;
+  reason: string;
+  angle: RadarAngle;
+}
+
+export interface BrainDumpClient {
+  names: string[];
+  location_context: string;
+  transaction_history: {
+    approx_year: string;
+    notes: string;
+  };
+  radar_interests: string[];
+  family_details: {
+    children: string[];
+    pets: string[];
+  };
+  mortgage_inference: MortgageInference;
+  suggested_action: string;
+}
