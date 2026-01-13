@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Contact, ContactNote, GeneratedMessage, RadarState } from '../types';
 import { generateRadarMessage, determineAngle } from '../services/geminiService';
 import { dataService } from '../services/dataService';
@@ -18,7 +18,9 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
     const [editedMessage, setEditedMessage] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState<string | null>(null);
     const [showWhy, setShowWhy] = useState(false);
+    const messageRef = useRef<HTMLTextAreaElement | null>(null);
 
     useEffect(() => {
         loadPrompt();
@@ -50,10 +52,31 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
         });
     };
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(editedMessage);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const selectMessageForManualCopy = () => {
+        if (!isEditing) {
+            setIsEditing(true);
+        }
+
+        setTimeout(() => {
+            if (messageRef.current) {
+                messageRef.current.focus();
+                messageRef.current.select();
+            }
+        }, 0);
+    };
+
+    const handleCopy = async () => {
+        setCopyError(null);
+
+        try {
+            await navigator.clipboard.writeText(editedMessage);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (error) {
+            setCopied(false);
+            setCopyError('Copy failed. Select the message and copy manually.');
+            selectMessageForManualCopy();
+        }
     };
 
     if (loading) {
@@ -118,6 +141,7 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                         rows={3}
                         value={editedMessage}
                         onChange={(e) => setEditedMessage(e.target.value)}
+                        ref={messageRef}
                     />
                 ) : (
                     <p className="text-slate-200 text-sm whitespace-pre-wrap leading-relaxed font-medium" onClick={() => setIsEditing(true)}>
@@ -126,19 +150,26 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                 )}
             </div>
 
-            <div className="flex gap-3">
-                <button 
-                    onClick={handleCopy}
-                    className={`flex-[2] py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950'}`}
-                >
-                    {copied ? 'Copied' : 'Copy Message'}
-                </button>
-                <button 
-                    onClick={onReachedOut}
-                    className="flex-1 py-4 bg-slate-900 border border-white/5 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
-                >
-                    Sent
-                </button>
+            <div>
+                <div className="flex gap-3">
+                    <button 
+                        onClick={handleCopy}
+                        className={`flex-[2] py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950'}`}
+                    >
+                        {copied ? 'Copied' : 'Copy Message'}
+                    </button>
+                    <button 
+                        onClick={onReachedOut}
+                        className="flex-1 py-4 bg-slate-900 border border-white/5 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
+                    >
+                        Sent
+                    </button>
+                </div>
+                {copyError && (
+                    <p className="mt-2 text-[10px] font-semibold text-amber-400">
+                        {copyError}
+                    </p>
+                )}
             </div>
         </div>
     );
