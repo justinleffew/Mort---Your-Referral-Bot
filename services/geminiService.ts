@@ -3,7 +3,13 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient } from "../types";
 
 export const getAi = () => {
-    const apiKey = process.env.API_KEY;
+    const localStorageKey = typeof localStorage !== 'undefined'
+        ? localStorage.getItem('GEMINI_API_KEY')
+        : null;
+    const envApiKey = import.meta.env.VITE_GEMINI_API_KEY
+        ?? process.env.GEMINI_API_KEY
+        ?? process.env.API_KEY;
+    const apiKey = localStorageKey || envApiKey;
     if (!apiKey) return null;
     return new GoogleGenAI({ apiKey });
 };
