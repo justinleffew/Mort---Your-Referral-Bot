@@ -1,3 +1,4 @@
+import { SupabaseClient } from '@supabase/supabase-js';
 import { BrainDumpClient, Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from '../types';
 import { authService } from './authService';
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
@@ -62,6 +63,62 @@ const loadObject = <T>(key: string): T | null => {
 };
 
 const uuid = () => crypto.randomUUID();
+const DEFAULT_PROFILE_NAME = 'Agent';
+let authProfileInitialized = false;
+
+const resolveProfileName = (userName?: string, metadata?: Record<string, any>) => {
+  const trimmed = userName?.trim();
+  if (trimmed) return trimmed;
+  const metaName = metadata?.full_name || metadata?.name;
+  if (typeof metaName === 'string' && metaName.trim()) return metaName.trim();
+  return DEFAULT_PROFILE_NAME;
+};
+
+const getAuthUser = async () => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    console.warn('Failed to load auth user', error);
+    return null;
+  }
+  return data.user ?? null;
+};
+
+const upsertProfileForUser = async (user: { id: string; user_metadata?: Record<string, any> }, nameOverride?: string) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  const name = resolveProfileName(nameOverride, user.user_metadata);
+  const { error } = await supabase.from('realtor_profiles').upsert(
+    {
+      user_id: user.id,
+      name,
+      headshot: null,
+    },
+    {
+      onConflict: 'user_id',
+      ignoreDuplicates: true,
+    }
+  );
+  if (error) {
+    console.warn('Failed to initialize profile', error);
+  }
+};
+
+const ensureAuthProfile = async (nameOverride?: string) => {
+  const user = await getAuthUser();
+  if (!user) return;
+  await upsertProfileForUser(user, nameOverride);
+};
+
+const getSupabaseUserId = async (supabase: SupabaseClient): Promise<string | null> => {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    console.warn('Failed to load authenticated user', error);
+    return null;
+  }
+  return data.user?.id ?? null;
+};
 
 const getLocalAgentId = () => {
   const existing = localStorage.getItem(STORAGE_KEYS.AGENT_ID);
@@ -97,31 +154,65 @@ const defaultRadarState = (contactId: string, userId: string): RadarState => ({
 });
 
 export const dataService = {
+  initAuthProfile: async (nameOverride?: string) => {
+    const supabase = getSupabaseClient();
+    if (!supabase || authProfileInitialized) return;
+    authProfileInitialized = true;
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) return;
+      void upsertProfileForUser(session.user, nameOverride);
+    });
+    await ensureAuthProfile(nameOverride);
+  },
+
   getProfile: async (): Promise<RealtorProfile> => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return { name: 'Agent' };
+      const user = await getAuthUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('realtor_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (error) {
+          console.warn('Failed to load profile', error);
+        }
+        if (data) {
+          return { name: data.name, headshot: data.headshot };
+        }
+        return { name: resolveProfileName(undefined, user.user_metadata) };
+      }
       const { data, error } = await supabase
         .from('realtor_profiles')
         .select('*')
-        .eq('user_id', agentId)
+        .eq('user_id', getAgentId())
         .maybeSingle();
       if (error) {
         console.warn('Failed to load profile', error);
       }
-      return data ? { name: data.name, headshot: data.headshot } : { name: 'Agent' };
+      return data ? { name: data.name, headshot: data.headshot } : { name: DEFAULT_PROFILE_NAME };
     }
-    return loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE) || { name: 'Agent' };
+    return loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE) || { name: DEFAULT_PROFILE_NAME };
   },
 
   saveProfile: async (profile: RealtorProfile) => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return;
+      const user = await getAuthUser();
+      if (user) {
+        const { error } = await supabase.from('realtor_profiles').upsert({
+          user_id: user.id,
+          name: profile.name,
+          headshot: profile.headshot ?? null,
+        });
+        if (error) {
+          console.warn('Failed to save profile', error);
+        }
+        return;
+      }
       const { error } = await supabase.from('realtor_profiles').upsert({
-        user_id: agentId,
+        user_id: getAgentId(),
         name: profile.name,
         headshot: profile.headshot ?? null,
       });
@@ -136,12 +227,15 @@ export const dataService = {
   getContacts: async (): Promise<Contact[]> => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return [];
+      const userId = await getSupabaseUserId(supabase);
+      if (!userId) {
+        console.warn('No authenticated user available for contacts load');
+        return [];
+      }
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
-        .eq('user_id', agentId)
+        .eq('user_id', userId)
         .eq('archived', false);
       if (error) {
         console.warn('Failed to load contacts', error);
@@ -155,13 +249,16 @@ export const dataService = {
   getContactById: async (id: string): Promise<Contact | null> => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return null;
+      const userId = await getSupabaseUserId(supabase);
+      if (!userId) {
+        console.warn('No authenticated user available for contact lookup');
+        return null;
+      }
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
         .eq('id', id)
-        .eq('user_id', agentId)
+        .eq('user_id', userId)
         .maybeSingle();
       if (error) {
         console.warn('Failed to load contact', error);
@@ -175,10 +272,31 @@ export const dataService = {
 
   addContact: async (data: Partial<Contact>): Promise<Contact> => {
     const supabase = getSupabaseClient();
-    const agentId = supabase ? await getAuthenticatedUserId() : getLocalAgentId();
+    const agentId = getAgentId();
+    const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
+    if (supabase && !userId) {
+      console.warn('No authenticated user available for contact insert');
+      return normalizeContact({
+        id: uuid(),
+        user_id: agentId,
+        full_name: data.full_name || 'Unknown',
+        phone: data.phone || '',
+        email: data.email || '',
+        location_context: data.location_context || '',
+        sale_date: data.sale_date,
+        last_contacted_at: data.last_contacted_at,
+        comfort_level: data.comfort_level || 'maybe',
+        archived: false,
+        created_at: new Date().toISOString(),
+        radar_interests: data.radar_interests || [],
+        family_details: data.family_details || { children: [], pets: [] },
+        mortgage_inference: data.mortgage_inference,
+        suggested_action: data.suggested_action,
+      });
+    }
     const payload: Contact = normalizeContact({
       id: uuid(),
-      user_id: agentId ?? 'unauthenticated',
+      user_id: userId ?? agentId,
       full_name: data.full_name || 'Unknown',
       phone: data.phone || '',
       email: data.email || '',
@@ -207,7 +325,7 @@ export const dataService = {
       }
       await supabase.from('radar_state').insert({
         contact_id: inserted.id,
-        user_id: agentId,
+        user_id: userId,
         reached_out: false,
         angles_used_json: [],
         last_refreshed_at: new Date().toISOString(),
@@ -246,9 +364,13 @@ export const dataService = {
   updateContact: async (id: string, data: Partial<Contact>) => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return;
-      const { error } = await supabase.from('contacts').update(data).eq('id', id).eq('user_id', agentId);
+      const userId = await getSupabaseUserId(supabase);
+      if (!userId) {
+        console.warn('No authenticated user available for contact update');
+        return;
+      }
+      const payload = { ...data, user_id: userId };
+      const { error } = await supabase.from('contacts').update(payload).eq('id', id).eq('user_id', userId);
       if (error) {
         console.warn('Failed to update contact', error);
       }
@@ -266,13 +388,16 @@ export const dataService = {
   getNotes: async (contactId: string): Promise<ContactNote[]> => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return [];
+      const userId = await getSupabaseUserId(supabase);
+      if (!userId) {
+        console.warn('No authenticated user available for notes load');
+        return [];
+      }
       const { data, error } = await supabase
         .from('contact_notes')
         .select('*')
         .eq('contact_id', contactId)
-        .eq('user_id', agentId)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) {
         console.warn('Failed to load notes', error);
@@ -285,11 +410,16 @@ export const dataService = {
 
   addNote: async (contactId: string, text: string) => {
     const supabase = getSupabaseClient();
-    const agentId = supabase ? await getAuthenticatedUserId() : getLocalAgentId();
+    const agentId = getAgentId();
+    const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
+    if (supabase && !userId) {
+      console.warn('No authenticated user available for note insert');
+      return;
+    }
     const note: ContactNote = {
       id: uuid(),
       contact_id: contactId,
-      user_id: agentId ?? 'unauthenticated',
+      user_id: userId ?? agentId,
       note_text: text,
       created_at: new Date().toISOString(),
     };
@@ -311,20 +441,23 @@ export const dataService = {
   getRadarState: async (contactId: string): Promise<RadarState | null> => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return null;
+      const userId = await getSupabaseUserId(supabase);
+      if (!userId) {
+        console.warn('No authenticated user available for radar state load');
+        return null;
+      }
       const { data, error } = await supabase
         .from('radar_state')
         .select('*')
         .eq('contact_id', contactId)
-        .eq('user_id', agentId)
+        .eq('user_id', userId)
         .maybeSingle();
       if (error) {
         console.warn('Failed to load radar state', error);
         return null;
       }
       if (data) return data;
-      const fallback = defaultRadarState(contactId, agentId);
+      const fallback = defaultRadarState(contactId, userId);
       await supabase.from('radar_state').insert(fallback);
       return fallback;
     }
@@ -334,13 +467,16 @@ export const dataService = {
   updateRadarState: async (contactId: string, data: Partial<RadarState>) => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return;
+      const userId = await getSupabaseUserId(supabase);
+      if (!userId) {
+        console.warn('No authenticated user available for radar state update');
+        return;
+      }
       const { data: existing, error: loadError } = await supabase
         .from('radar_state')
         .select('*')
         .eq('contact_id', contactId)
-        .eq('user_id', agentId)
+        .eq('user_id', userId)
         .maybeSingle();
       if (loadError) {
         console.warn('Failed to load radar state for update', loadError);
@@ -350,8 +486,9 @@ export const dataService = {
         ? [...(existing?.angles_used_json || []), ...data.angles_used_json].slice(-10)
         : existing?.angles_used_json;
       const payload = {
-        ...(existing ?? defaultRadarState(contactId, agentId)),
+        ...(existing ?? defaultRadarState(contactId, userId)),
         ...data,
+        user_id: userId,
         angles_used_json: mergedAngles ?? [],
       };
       const { error } = await supabase.from('radar_state').upsert(payload);
@@ -380,13 +517,16 @@ export const dataService = {
   getTouches: async (contactId: string): Promise<Touch[]> => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return [];
+      const userId = await getSupabaseUserId(supabase);
+      if (!userId) {
+        console.warn('No authenticated user available for touches load');
+        return [];
+      }
       const { data, error } = await supabase
         .from('touches')
         .select('*')
         .eq('contact_id', contactId)
-        .eq('user_id', agentId)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) {
         console.warn('Failed to load touches', error);
@@ -403,11 +543,16 @@ export const dataService = {
     options?: { channel?: string; body?: string; source?: string }
   ) => {
     const supabase = getSupabaseClient();
-    const agentId = supabase ? await getAuthenticatedUserId() : getLocalAgentId();
+    const agentId = getAgentId();
+    const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
+    if (supabase && !userId) {
+      console.warn('No authenticated user available for touch insert');
+      return;
+    }
     const touch: Touch = {
       id: uuid(),
       contact_id: contactId,
-      user_id: agentId ?? 'unauthenticated',
+      user_id: userId ?? agentId,
       type,
       channel: options?.channel,
       body: options?.body,
@@ -421,7 +566,11 @@ export const dataService = {
       if (error) {
         console.warn('Failed to add touch', error);
       }
-      await supabase.from('contacts').update({ last_contacted_at: touch.created_at }).eq('id', contactId).eq('user_id', agentId);
+      await supabase
+        .from('contacts')
+        .update({ last_contacted_at: touch.created_at, user_id: userId })
+        .eq('id', contactId)
+        .eq('user_id', userId);
       return;
     }
 
@@ -447,9 +596,12 @@ export const dataService = {
     const supabase = getSupabaseClient();
     let radarStates: RadarState[] = [];
     if (supabase) {
-      const agentId = await getAuthenticatedUserId();
-      if (!agentId) return [];
-      const { data, error } = await supabase.from('radar_state').select('*').eq('user_id', agentId);
+      const userId = await getSupabaseUserId(supabase);
+      if (!userId) {
+        console.warn('No authenticated user available for radar state eligibility load');
+        return [];
+      }
+      const { data, error } = await supabase.from('radar_state').select('*').eq('user_id', userId);
       if (error) {
         console.warn('Failed to load radar states', error);
       }
