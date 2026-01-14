@@ -1,17 +1,16 @@
-
-import { Contact, ContactNote, RadarState, ComfortLevel, RealtorProfile, BrainDumpClient } from '../types';
+import { BrainDumpClient, Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from '../types';
+import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
 
 const STORAGE_KEYS = {
   CONTACTS: 'mort_contacts',
   NOTES: 'mort_notes',
   RADAR: 'mort_radar_state',
-  USER: 'mort_user',
   PROFILE: 'mort_realtor_profile',
+  TOUCHES: 'mort_touches',
+  AGENT_ID: 'mort_agent_id',
 };
 
-const MOCK_USER_ID = 'user_123';
-
-const STORAGE_VERSION = 'v1';
+const STORAGE_VERSION = 'v2';
 
 type VersionedPayload<T> = {
   version: string;
@@ -22,6 +21,7 @@ const save = (key: string, data: any) => {
   const payload: VersionedPayload<any> = { version: STORAGE_VERSION, data };
   localStorage.setItem(key, JSON.stringify(payload));
 };
+
 const load = <T>(key: string): T[] => {
   const str = localStorage.getItem(key);
   if (!str) return [];
@@ -40,6 +40,7 @@ const load = <T>(key: string): T[] => {
     return [];
   }
 };
+
 const loadObject = <T>(key: string): T | null => {
   const str = localStorage.getItem(key);
   if (!str) return null;
@@ -58,29 +59,111 @@ const loadObject = <T>(key: string): T | null => {
     return null;
   }
 };
+
 const uuid = () => crypto.randomUUID();
 
+const getAgentId = () => {
+  const existing = localStorage.getItem(STORAGE_KEYS.AGENT_ID);
+  if (existing) return existing;
+  const next = uuid();
+  localStorage.setItem(STORAGE_KEYS.AGENT_ID, next);
+  return next;
+};
+
+const normalizeContact = (contact: Contact): Contact => ({
+  ...contact,
+  radar_interests: contact.radar_interests ?? [],
+  family_details: contact.family_details ?? { children: [], pets: [] },
+});
+
+const defaultRadarState = (contactId: string, userId: string): RadarState => ({
+  id: uuid(),
+  contact_id: contactId,
+  user_id: userId,
+  reached_out: false,
+  angles_used_json: [],
+  last_refreshed_at: new Date().toISOString(),
+});
+
 export const dataService = {
-  getProfile: (): RealtorProfile => {
+  getProfile: async (): Promise<RealtorProfile> => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('realtor_profiles')
+        .select('*')
+        .eq('user_id', agentId)
+        .maybeSingle();
+      if (error) {
+        console.warn('Failed to load profile', error);
+      }
+      return data ? { name: data.name, headshot: data.headshot } : { name: 'Agent' };
+    }
     return loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE) || { name: 'Agent' };
   },
-  saveProfile: (profile: RealtorProfile) => {
+
+  saveProfile: async (profile: RealtorProfile) => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { error } = await supabase.from('realtor_profiles').upsert({
+        user_id: agentId,
+        name: profile.name,
+        headshot: profile.headshot ?? null,
+      });
+      if (error) {
+        console.warn('Failed to save profile', error);
+      }
+      return;
+    }
     save(STORAGE_KEYS.PROFILE, profile);
   },
 
-  getContacts: (): Contact[] => {
-    return load<Contact>(STORAGE_KEYS.CONTACTS).filter(c => !c.archived);
+  getContacts: async (): Promise<Contact[]> => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', agentId)
+        .eq('archived', false);
+      if (error) {
+        console.warn('Failed to load contacts', error);
+        return [];
+      }
+      return (data || []).map(normalizeContact);
+    }
+    return load<Contact>(STORAGE_KEYS.CONTACTS).filter(c => !c.archived).map(normalizeContact);
   },
 
-  getContactById: (id: string): Contact | undefined => {
-    return load<Contact>(STORAGE_KEYS.CONTACTS).find(c => c.id === id);
+  getContactById: async (id: string): Promise<Contact | null> => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', agentId)
+        .maybeSingle();
+      if (error) {
+        console.warn('Failed to load contact', error);
+        return null;
+      }
+      return data ? normalizeContact(data) : null;
+    }
+    const contact = load<Contact>(STORAGE_KEYS.CONTACTS).find(c => c.id === id);
+    return contact ? normalizeContact(contact) : null;
   },
 
-  addContact: (data: Partial<Contact>): Contact => {
-    const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
-    const newContact: Contact = {
+  addContact: async (data: Partial<Contact>): Promise<Contact> => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    const payload: Contact = normalizeContact({
       id: uuid(),
-      user_id: MOCK_USER_ID,
+      user_id: agentId,
       full_name: data.full_name || 'Unknown',
       phone: data.phone || '',
       email: data.email || '',
@@ -94,27 +177,42 @@ export const dataService = {
       family_details: data.family_details || { children: [], pets: [] },
       mortgage_inference: data.mortgage_inference,
       suggested_action: data.suggested_action,
-    };
-    contacts.push(newContact);
+    });
+
+    if (supabase) {
+      const { data: inserted, error } = await supabase
+        .from('contacts')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.warn('Failed to add contact', error);
+        return payload;
+      }
+      await supabase.from('radar_state').insert({
+        contact_id: inserted.id,
+        user_id: agentId,
+        reached_out: false,
+        angles_used_json: [],
+        last_refreshed_at: new Date().toISOString(),
+      });
+      return normalizeContact(inserted);
+    }
+
+    const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
+    contacts.push(payload);
     save(STORAGE_KEYS.CONTACTS, contacts);
-    
+
     const radarStates = load<RadarState>(STORAGE_KEYS.RADAR);
-    radarStates.push({
-      id: uuid(),
-      contact_id: newContact.id,
-      user_id: MOCK_USER_ID,
-      reached_out: false,
-      angles_used_json: [],
-      last_refreshed_at: new Date().toISOString()
-    } as any);
+    radarStates.push(defaultRadarState(payload.id, agentId));
     save(STORAGE_KEYS.RADAR, radarStates);
 
-    return newContact;
+    return payload;
   },
 
-  addBrainDumpClients: (clients: BrainDumpClient[]) => {
-    clients.forEach(c => {
-      const contact = dataService.addContact({
+  addBrainDumpClients: async (clients: BrainDumpClient[]) => {
+    for (const c of clients) {
+      const contact = await dataService.addContact({
         full_name: c.names.join(' & '),
         location_context: c.location_context,
         sale_date: c.transaction_history.approx_year ? `${c.transaction_history.approx_year}-01-01` : undefined,
@@ -124,12 +222,22 @@ export const dataService = {
         suggested_action: c.suggested_action,
       });
       if (c.transaction_history.notes) {
-        dataService.addNote(contact.id, c.transaction_history.notes);
+        await dataService.addNote(contact.id, c.transaction_history.notes);
       }
-    });
+    }
   },
 
-  updateContact: (id: string, data: Partial<Contact>) => {
+  updateContact: async (id: string, data: Partial<Contact>) => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { error } = await supabase.from('contacts').update(data).eq('id', id).eq('user_id', agentId);
+      if (error) {
+        console.warn('Failed to update contact', error);
+      }
+      return;
+    }
+
     const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
     const index = contacts.findIndex(c => c.id === id);
     if (index !== -1) {
@@ -138,27 +246,100 @@ export const dataService = {
     }
   },
 
-  getNotes: (contactId: string): ContactNote[] => {
+  getNotes: async (contactId: string): Promise<ContactNote[]> => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('contact_notes')
+        .select('*')
+        .eq('contact_id', contactId)
+        .eq('user_id', agentId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Failed to load notes', error);
+        return [];
+      }
+      return data || [];
+    }
     return load<ContactNote>(STORAGE_KEYS.NOTES).filter(n => n.contact_id === contactId);
   },
 
-  addNote: (contactId: string, text: string) => {
-    const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
-    notes.push({
+  addNote: async (contactId: string, text: string) => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    const note: ContactNote = {
       id: uuid(),
       contact_id: contactId,
-      user_id: MOCK_USER_ID,
+      user_id: agentId,
       note_text: text,
       created_at: new Date().toISOString(),
-    });
+    };
+
+    if (supabase) {
+      const { error } = await supabase.from('contact_notes').insert(note);
+      if (error) {
+        console.warn('Failed to add note', error);
+      }
+      return;
+    }
+
+    const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
+    notes.push(note);
     save(STORAGE_KEYS.NOTES, notes);
   },
 
-  getRadarState: (contactId: string): RadarState | undefined => {
-    return load<RadarState>(STORAGE_KEYS.RADAR).find(r => r.contact_id === contactId);
+  getRadarState: async (contactId: string): Promise<RadarState | null> => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('radar_state')
+        .select('*')
+        .eq('contact_id', contactId)
+        .eq('user_id', agentId)
+        .maybeSingle();
+      if (error) {
+        console.warn('Failed to load radar state', error);
+        return null;
+      }
+      if (data) return data;
+      const fallback = defaultRadarState(contactId, agentId);
+      await supabase.from('radar_state').insert(fallback);
+      return fallback;
+    }
+    return load<RadarState>(STORAGE_KEYS.RADAR).find(r => r.contact_id === contactId) || null;
   },
 
-  updateRadarState: (contactId: string, data: Partial<RadarState>) => {
+  updateRadarState: async (contactId: string, data: Partial<RadarState>) => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { data: existing, error: loadError } = await supabase
+        .from('radar_state')
+        .select('*')
+        .eq('contact_id', contactId)
+        .eq('user_id', agentId)
+        .maybeSingle();
+      if (loadError) {
+        console.warn('Failed to load radar state for update', loadError);
+        return;
+      }
+      const mergedAngles = data.angles_used_json
+        ? [...(existing?.angles_used_json || []), ...data.angles_used_json].slice(-10)
+        : existing?.angles_used_json;
+      const payload = {
+        ...(existing ?? defaultRadarState(contactId, agentId)),
+        ...data,
+        angles_used_json: mergedAngles ?? [],
+      };
+      const { error } = await supabase.from('radar_state').upsert(payload);
+      if (error) {
+        console.warn('Failed to update radar state', error);
+      }
+      return;
+    }
+
     const states = load<RadarState>(STORAGE_KEYS.RADAR);
     const index = states.findIndex(r => r.contact_id === contactId);
     if (index !== -1) {
@@ -175,47 +356,114 @@ export const dataService = {
     }
   },
 
-  getEligibleContacts: (): Contact[] => {
-    const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
-    const radarStates = load<RadarState>(STORAGE_KEYS.RADAR);
-    const today = new Date();
-    
-    return contacts.filter(c => {
-      if (c.archived) return false;
-      const state = radarStates.find(r => r.contact_id === c.id);
-      if (!state) return false;
-      if (state.reached_out) return false;
+  getTouches: async (contactId: string): Promise<Touch[]> => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('touches')
+        .select('*')
+        .eq('contact_id', contactId)
+        .eq('user_id', agentId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Failed to load touches', error);
+        return [];
+      }
+      return data || [];
+    }
+    return load<Touch>(STORAGE_KEYS.TOUCHES).filter(t => t.contact_id === contactId);
+  },
 
+  addTouch: async (
+    contactId: string,
+    type: TouchType,
+    options?: { channel?: string; body?: string; source?: string }
+  ) => {
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    const touch: Touch = {
+      id: uuid(),
+      contact_id: contactId,
+      user_id: agentId,
+      type,
+      channel: options?.channel,
+      body: options?.body,
+      source: options?.source,
+      created_at: new Date().toISOString(),
+    };
+
+    if (supabase) {
+      const { error } = await supabase.from('touches').insert(touch);
+      if (error) {
+        console.warn('Failed to add touch', error);
+      }
+      await supabase.from('contacts').update({ last_contacted_at: touch.created_at }).eq('id', contactId).eq('user_id', agentId);
+      return;
+    }
+
+    const touches = load<Touch>(STORAGE_KEYS.TOUCHES);
+    touches.push(touch);
+    save(STORAGE_KEYS.TOUCHES, touches);
+    await dataService.updateContact(contactId, { last_contacted_at: touch.created_at });
+  },
+
+  getTouchSummary: async (contactId: string) => {
+    const touches = await dataService.getTouches(contactId);
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const startOfQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    const yearCount = touches.filter(t => new Date(t.created_at) >= startOfYear).length;
+    const quarterCount = touches.filter(t => new Date(t.created_at) >= startOfQuarter).length;
+    const lastTouch = touches[0]?.created_at;
+    return { yearCount, quarterCount, lastTouch };
+  },
+
+  getEligibleContacts: async (): Promise<Contact[]> => {
+    const contacts = await dataService.getContacts();
+    const supabase = getSupabaseClient();
+    const agentId = getAgentId();
+    let radarStates: RadarState[] = [];
+    if (supabase) {
+      const { data, error } = await supabase.from('radar_state').select('*').eq('user_id', agentId);
+      if (error) {
+        console.warn('Failed to load radar states', error);
+      }
+      radarStates = data || [];
+    } else {
+      radarStates = load<RadarState>(STORAGE_KEYS.RADAR);
+    }
+
+    const today = new Date();
+    return contacts.filter(contact => {
+      if (contact.archived) return false;
+      const state = radarStates.find(r => r.contact_id === contact.id);
+      if (!state) return true;
       if (state.suppressed_until && new Date(state.suppressed_until) > today) return false;
 
-      // New logic: If they have a suggested action from a fresh brain dump, prioritize them
-      if (c.suggested_action && !state.last_prompt_shown_at) return true;
+      if (contact.suggested_action && !state.last_prompt_shown_at) return true;
 
       const threeMonthsAgo = new Date();
       threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
-      const lastContactDate = c.last_contacted_at ? new Date(c.last_contacted_at) : null;
-      const saleDate = c.sale_date ? new Date(c.sale_date) : null;
+      const lastContactDate = contact.last_contacted_at ? new Date(contact.last_contacted_at) : null;
+      const saleDate = contact.sale_date ? new Date(contact.sale_date) : null;
 
-      let isTimeEligible = false;
       if (lastContactDate) {
-        isTimeEligible = lastContactDate <= threeMonthsAgo;
-      } else if (saleDate) {
-        isTimeEligible = saleDate <= threeMonthsAgo;
-      } else {
-        isTimeEligible = true; // New entries are immediately eligible
+        return lastContactDate <= threeMonthsAgo;
       }
-
-      return isTimeEligible;
+      if (saleDate) {
+        return saleDate <= threeMonthsAgo;
+      }
+      return true;
     }).sort((a, b) => {
-        // Boost contacts with suggested actions or rich interest data
-        const aScore = (a.suggested_action ? 100 : 0) + (a.radar_interests.length * 10);
-        const bScore = (b.suggested_action ? 100 : 0) + (b.radar_interests.length * 10);
-        return bScore - aScore;
+      const aScore = (a.suggested_action ? 100 : 0) + (a.radar_interests.length * 10);
+      const bScore = (b.suggested_action ? 100 : 0) + (b.radar_interests.length * 10);
+      return bScore - aScore;
     });
   },
-  
-  bulkImport: (rows: any[]) => {
-    const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
+
+  bulkImport: async (rows: any[]) => {
+    const contacts = await dataService.getContacts();
     const normalizeName = (value: string) => value.trim();
     const normalizeEmail = (value: string) => value.trim().toLowerCase();
     const normalizePhone = (value: string) => {
@@ -242,7 +490,7 @@ export const dataService = {
     let updated = 0;
     let skipped = 0;
 
-    rows.forEach(row => {
+    for (const row of rows) {
       const rawName = row['Name'] || row['Full Name'] || row['name'] || '';
       const rawPhone = row['Phone'] || row['phone'] || row['Mobile'] || '';
       const rawEmail = row['Email'] || row['email'] || '';
@@ -268,18 +516,18 @@ export const dataService = {
         });
 
         if (hasChanges) {
-          dataService.updateContact(existing.id, nextData);
+          await dataService.updateContact(existing.id, nextData);
           const updatedContact = { ...existing, ...nextData };
-          if (email) contactsByEmail.set(email, updatedContact);
-          if (phone) contactsByPhone.set(phone, updatedContact);
+          if (email) contactsByEmail.set(email, updatedContact as Contact);
+          if (phone) contactsByPhone.set(phone, updatedContact as Contact);
           updated += 1;
         } else {
           skipped += 1;
         }
-        return;
+        continue;
       }
 
-      const newContact = dataService.addContact({
+      const newContact = await dataService.addContact({
         full_name,
         phone,
         email,
@@ -289,16 +537,18 @@ export const dataService = {
       if (email) contactsByEmail.set(email, newContact);
       if (phone) contactsByPhone.set(phone, newContact);
       added += 1;
-    });
+    }
 
     return { added, updated, skipped };
   },
 
-  getStats: () => {
-    const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
+  getStats: async () => {
+    const contacts = await dataService.getContacts();
     const total = contacts.length;
     const withInterests = contacts.filter(c => c.radar_interests.length > 0).length;
     const percent = total === 0 ? 0 : Math.round((withInterests / total) * 100);
     return { total, withInterests, percent };
-  }
+  },
+
+  isSupabaseEnabled: () => isSupabaseConfigured(),
 };

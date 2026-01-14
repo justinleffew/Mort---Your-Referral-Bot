@@ -54,6 +54,19 @@ export interface RadarState {
   last_refreshed_at?: string;
 }
 
+export type TouchType = 'call' | 'text' | 'email' | 'meeting' | 'auto';
+
+export interface Touch {
+  id: string;
+  contact_id: string;
+  user_id: string;
+  type: TouchType;
+  channel?: string;
+  body?: string;
+  created_at: string;
+  source?: string;
+}
+
 export interface MortgageQueryResponse {
   buyer_script: string;
   ballpark_numbers: string;

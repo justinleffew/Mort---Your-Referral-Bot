@@ -43,7 +43,7 @@ const CommuteMode: React.FC = () => {
         if (!transcript) return;
         setIsProcessing(true);
         const clients = await processBrainDump(transcript);
-        dataService.addBrainDumpClients(clients);
+        await dataService.addBrainDumpClients(clients);
         setIsProcessing(false);
         navigate('/');
     };
