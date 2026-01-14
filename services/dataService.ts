@@ -127,6 +127,16 @@ const getAgentId = () => {
   return next;
 };
 
+const getSupabaseUserId = async (supabase: ReturnType<typeof getSupabaseClient>) => {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    console.warn('Failed to load Supabase user', error);
+    return null;
+  }
+  return data.user?.id ?? null;
+};
+
 const normalizeContact = (contact: Contact): Contact => ({
   ...contact,
   radar_interests: contact.radar_interests ?? [],
@@ -156,6 +166,12 @@ export const dataService = {
 
   getProfile: async (): Promise<RealtorProfile> => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      const { data, error } = await supabase
+        .from('realtor_profiles')
+        .select('*')
+        .eq('user_id', userId)
     if (supabase) {
       const user = await getAuthUser();
       if (user) {
@@ -187,6 +203,10 @@ export const dataService = {
 
   saveProfile: async (profile: RealtorProfile) => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      const { error } = await supabase.from('realtor_profiles').upsert({
+        user_id: userId,
     if (supabase) {
       const user = await getAuthUser();
       if (user) {
@@ -215,6 +235,8 @@ export const dataService = {
 
   getContacts: async (): Promise<Contact[]> => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
     if (supabase) {
       const userId = await getSupabaseUserId(supabase);
       if (!userId) {
@@ -237,6 +259,8 @@ export const dataService = {
 
   getContactById: async (id: string): Promise<Contact | null> => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
     if (supabase) {
       const userId = await getSupabaseUserId(supabase);
       if (!userId) {
@@ -261,6 +285,11 @@ export const dataService = {
 
   addContact: async (data: Partial<Contact>): Promise<Contact> => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    const localAgentId = getAgentId();
+    const payload: Contact = normalizeContact({
+      id: uuid(),
+      user_id: localAgentId,
     const agentId = getAgentId();
     const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
     if (supabase && !userId) {
@@ -301,10 +330,11 @@ export const dataService = {
       suggested_action: data.suggested_action,
     });
 
-    if (supabase) {
+    if (supabase && userId) {
+      const supabasePayload = { ...payload, user_id: userId };
       const { data: inserted, error } = await supabase
         .from('contacts')
-        .insert(payload)
+        .insert(supabasePayload)
         .select()
         .single();
       if (error) {
@@ -326,7 +356,7 @@ export const dataService = {
     save(STORAGE_KEYS.CONTACTS, contacts);
 
     const radarStates = load<RadarState>(STORAGE_KEYS.RADAR);
-    radarStates.push(defaultRadarState(payload.id, agentId));
+    radarStates.push(defaultRadarState(payload.id, localAgentId));
     save(STORAGE_KEYS.RADAR, radarStates);
 
     return payload;
@@ -351,6 +381,13 @@ export const dataService = {
 
   updateContact: async (id: string, data: Partial<Contact>) => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      const { error } = await supabase
+        .from('contacts')
+        .update({ ...data, user_id: userId })
+        .eq('id', id)
+        .eq('user_id', userId);
     if (supabase) {
       const userId = await getSupabaseUserId(supabase);
       if (!userId) {
@@ -375,6 +412,8 @@ export const dataService = {
 
   getNotes: async (contactId: string): Promise<ContactNote[]> => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
     if (supabase) {
       const userId = await getSupabaseUserId(supabase);
       if (!userId) {
@@ -398,6 +437,12 @@ export const dataService = {
 
   addNote: async (contactId: string, text: string) => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    const localAgentId = getAgentId();
+    const note: ContactNote = {
+      id: uuid(),
+      contact_id: contactId,
+      user_id: localAgentId,
     const agentId = getAgentId();
     const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
     if (supabase && !userId) {
@@ -412,8 +457,8 @@ export const dataService = {
       created_at: new Date().toISOString(),
     };
 
-    if (supabase) {
-      const { error } = await supabase.from('contact_notes').insert(note);
+    if (supabase && userId) {
+      const { error } = await supabase.from('contact_notes').insert({ ...note, user_id: userId });
       if (error) {
         console.warn('Failed to add note', error);
       }
@@ -427,6 +472,8 @@ export const dataService = {
 
   getRadarState: async (contactId: string): Promise<RadarState | null> => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
     if (supabase) {
       const userId = await getSupabaseUserId(supabase);
       if (!userId) {
@@ -453,6 +500,8 @@ export const dataService = {
 
   updateRadarState: async (contactId: string, data: Partial<RadarState>) => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
     if (supabase) {
       const userId = await getSupabaseUserId(supabase);
       if (!userId) {
@@ -503,6 +552,8 @@ export const dataService = {
 
   getTouches: async (contactId: string): Promise<Touch[]> => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
     if (supabase) {
       const userId = await getSupabaseUserId(supabase);
       if (!userId) {
@@ -530,6 +581,12 @@ export const dataService = {
     options?: { channel?: string; body?: string; source?: string }
   ) => {
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    const localAgentId = getAgentId();
+    const touch: Touch = {
+      id: uuid(),
+      contact_id: contactId,
+      user_id: localAgentId,
     const agentId = getAgentId();
     const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
     if (supabase && !userId) {
@@ -547,8 +604,8 @@ export const dataService = {
       created_at: new Date().toISOString(),
     };
 
-    if (supabase) {
-      const { error } = await supabase.from('touches').insert(touch);
+    if (supabase && userId) {
+      const { error } = await supabase.from('touches').insert({ ...touch, user_id: userId });
       if (error) {
         console.warn('Failed to add touch', error);
       }
@@ -580,6 +637,9 @@ export const dataService = {
   getEligibleContacts: async (): Promise<Contact[]> => {
     const contacts = await dataService.getContacts();
     const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    let radarStates: RadarState[] = [];
+    if (supabase && userId) {
     let radarStates: RadarState[] = [];
     if (supabase) {
       const userId = await getSupabaseUserId(supabase);
