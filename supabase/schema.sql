@@ -57,3 +57,8 @@ create table if not exists realtor_profiles (
   name text not null,
   headshot text
 );
+
+create index if not exists contacts_user_id_idx on contacts (user_id);
+create index if not exists contact_notes_contact_id_user_id_idx on contact_notes (contact_id, user_id);
+create index if not exists touches_contact_id_user_id_idx on touches (contact_id, user_id);
+create index if not exists radar_state_user_id_idx on radar_state (user_id);
