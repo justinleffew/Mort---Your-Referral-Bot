@@ -41,6 +41,9 @@ create table if not exists radar_state (
   last_refreshed_at timestamptz default now()
 );
 
+alter table radar_state
+  add constraint radar_state_contact_user_unique unique (contact_id, user_id);
+
 create table if not exists touches (
   id uuid primary key,
   contact_id uuid references contacts(id) on delete cascade,
