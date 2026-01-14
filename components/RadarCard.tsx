@@ -39,7 +39,7 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
         setLoading(false);
 
         const usedAt = new Date().toISOString();
-        dataService.updateRadarState(contact.id, {
+        await dataService.updateRadarState(contact.id, {
             angles_used_json: [{ angle, used_at: usedAt }],
             ...(forceRefresh
                 ? {}

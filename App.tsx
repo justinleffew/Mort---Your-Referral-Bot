@@ -1,43 +1,63 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import RadarCard from './components/RadarCard';
 import MortgageAssist from './components/MortgageAssist';
 import CommuteMode from './components/CommuteMode';
 import { dataService } from './services/dataService';
-import { Contact, RealtorProfile } from './types';
+import { Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from './types';
 
 const Dashboard: React.FC = () => {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [radarItems, setRadarItems] = useState<Array<{ contact: Contact; notes: ContactNote[]; state: RadarState }>>([]);
   const [stats, setStats] = useState({ total: 0, withInterests: 0, percent: 0 });
   const [showAddMenu, setShowAddMenu] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    refreshRadar();
+    void refreshRadar();
   }, []);
 
-  const refreshRadar = () => {
-    const eligible = dataService.getEligibleContacts().slice(0, 5);
-    setContacts(eligible);
-    setStats(dataService.getStats());
+  const refreshRadar = async () => {
+    const eligible = (await dataService.getEligibleContacts()).slice(0, 5);
+    const items = await Promise.all(
+      eligible.map(async contact => {
+        const [notes, state] = await Promise.all([
+          dataService.getNotes(contact.id),
+          dataService.getRadarState(contact.id),
+        ]);
+        return {
+          contact,
+          notes,
+          state: state ?? {
+            id: crypto.randomUUID(),
+            contact_id: contact.id,
+            user_id: contact.user_id,
+            reached_out: false,
+            angles_used_json: [],
+          },
+        };
+      })
+    );
+    setRadarItems(items);
+    const latestStats = await dataService.getStats();
+    setStats(latestStats);
   };
 
-  const handleReachedOut = (contactId: string) => {
-    dataService.updateRadarState(contactId, {
+  const handleReachedOut = async (contactId: string) => {
+    await dataService.addTouch(contactId, 'text', { channel: 'sms', source: 'radar' });
+    await dataService.updateRadarState(contactId, {
       reached_out: true,
       reached_out_at: new Date().toISOString(),
       suppressed_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
-    refreshRadar();
+    await refreshRadar();
   };
 
-  const handleDismiss = (contactId: string) => {
-     dataService.updateRadarState(contactId, {
+  const handleDismiss = async (contactId: string) => {
+    await dataService.updateRadarState(contactId, {
       suppressed_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
-    refreshRadar();
+    await refreshRadar();
   };
 
   return (
@@ -100,10 +120,10 @@ const Dashboard: React.FC = () => {
 
       <div className="flex justify-between items-center mb-6 px-2">
           <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Daily Targets</h1>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{contacts.length} Opportunity Found</span>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{radarItems.length} Opportunity Found</span>
       </div>
       
-      {contacts.length === 0 ? (
+      {radarItems.length === 0 ? (
         <div className="text-center py-16 px-6">
           <div className="relative w-40 h-40 mx-auto mb-10">
             <div className="absolute inset-0 border-2 border-slate-800 rounded-full"></div>
@@ -123,9 +143,7 @@ const Dashboard: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {contacts.map(contact => {
-            const notes = dataService.getNotes(contact.id);
-            const state = dataService.getRadarState(contact.id)!;
+          {radarItems.map(({ contact, notes, state }) => {
             return (
               <RadarCard 
                 key={contact.id}
@@ -147,12 +165,23 @@ const ContactDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [contact, setContact] = useState<Contact | null>(null);
+    const [touches, setTouches] = useState<Touch[]>([]);
+    const [touchSummary, setTouchSummary] = useState<{ yearCount: number; quarterCount: number; lastTouch?: string | null }>({
+        yearCount: 0,
+        quarterCount: 0,
+        lastTouch: null
+    });
 
     useEffect(() => {
-        if (id) {
-            const data = dataService.getContactById(id);
+        if (!id) return;
+        void (async () => {
+            const data = await dataService.getContactById(id);
             if (data) setContact(data);
-        }
+            const contactTouches = await dataService.getTouches(id);
+            setTouches(contactTouches);
+            const summary = await dataService.getTouchSummary(id);
+            setTouchSummary({ ...summary, lastTouch: summary.lastTouch || null });
+        })();
     }, [id]);
 
     if (!contact) return null;
@@ -168,6 +197,14 @@ const ContactDetail: React.FC = () => {
             </div>
         </div>
     );
+
+    const logTouch = async (type: TouchType) => {
+        await dataService.addTouch(contact.id, type, { source: 'manual' });
+        const updatedTouches = await dataService.getTouches(contact.id);
+        setTouches(updatedTouches);
+        const summary = await dataService.getTouchSummary(contact.id);
+        setTouchSummary({ ...summary, lastTouch: summary.lastTouch || null });
+    };
 
     return (
         <div className="max-w-md mx-auto p-6 space-y-8 pb-32">
@@ -223,6 +260,53 @@ const ContactDetail: React.FC = () => {
                         <p className="text-white font-bold text-sm leading-relaxed">{contact.mortgage_inference.reasoning}</p>
                     </div>
                 )}
+                <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Touch Cadence</p>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                            {touchSummary.quarterCount >= 1 ? 'On Track' : 'Due This Quarter'}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                        <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">This Q</p>
+                            <p className="text-xl font-black text-white">{touchSummary.quarterCount}</p>
+                        </div>
+                        <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">This Year</p>
+                            <p className="text-xl font-black text-white">{touchSummary.yearCount}</p>
+                        </div>
+                        <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Last Touch</p>
+                            <p className="text-xs font-bold text-white">
+                                {touchSummary.lastTouch ? new Date(touchSummary.lastTouch).toLocaleDateString() : 'None'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <button onClick={() => logTouch('call')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-white/5">
+                            Called
+                        </button>
+                        <button onClick={() => logTouch('text')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-white/5">
+                            Texted
+                        </button>
+                        <button onClick={() => logTouch('email')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-white/5">
+                            Emailed
+                        </button>
+                    </div>
+                    <div className="space-y-2">
+                        {touches.length === 0 ? (
+                            <p className="text-xs text-slate-600 italic">No touches logged yet.</p>
+                        ) : (
+                            touches.slice(0, 5).map(touch => (
+                                <div key={touch.id} className="flex items-center justify-between text-xs text-slate-300 bg-slate-900/40 border border-white/5 rounded-xl px-3 py-2">
+                                    <span className="font-bold uppercase tracking-widest">{touch.type}</span>
+                                    <span className="text-slate-500">{new Date(touch.created_at).toLocaleDateString()}</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -243,16 +327,17 @@ const EditContact: React.FC = () => {
     const isEditing = Boolean(id);
 
     useEffect(() => {
-        if (id) {
-            const data = dataService.getContactById(id);
+        if (!id) return;
+        void (async () => {
+            const data = await dataService.getContactById(id);
             if (data) {
                 setContact(data);
                 setInterestsInput(data.radar_interests.join(', '));
             }
-        }
+        })();
     }, [id]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!contact.full_name?.trim()) {
             alert("Name is required");
             return;
@@ -268,9 +353,9 @@ const EditContact: React.FC = () => {
         };
         
         if (isEditing && id) {
-            dataService.updateContact(id, finalContact);
+            await dataService.updateContact(id, finalContact);
         } else {
-            dataService.addContact(finalContact);
+            await dataService.addContact(finalContact);
         }
         navigate('/contacts');
     };
@@ -348,7 +433,14 @@ const Calculator: React.FC = () => {
   const [rate, setRate] = useState<number>(6.5);
   const [taxes, setTaxes] = useState<number>(6000);
   const [showMode, setShowMode] = useState(false);
-  const profile = dataService.getProfile();
+  const [profile, setProfile] = useState<RealtorProfile>({ name: 'Agent' });
+
+  useEffect(() => {
+    void (async () => {
+      const savedProfile = await dataService.getProfile();
+      setProfile(savedProfile);
+    })();
+  }, []);
   
   const getEstimatedInsurance = (p: number) => {
     if (p <= 300000) return 100;
@@ -427,7 +519,10 @@ const ContactsList: React.FC = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        setContacts(dataService.getContacts());
+        void (async () => {
+            const data = await dataService.getContacts();
+            setContacts(data);
+        })();
     }, []);
 
     const filtered = contacts.filter(c => 
@@ -520,7 +615,7 @@ const Settings: React.FC = () => {
     const storedApiKey = localStorage.getItem('GEMINI_API_KEY') || '';
     const [apiKey, setApiKey] = useState(storedApiKey);
     const [rememberApiKey, setRememberApiKey] = useState(Boolean(storedApiKey));
-    const [profile, setProfile] = useState<RealtorProfile>(dataService.getProfile());
+    const [profile, setProfile] = useState<RealtorProfile>({ name: 'Agent' });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -528,14 +623,21 @@ const Settings: React.FC = () => {
             localStorage.removeItem('GEMINI_API_KEY');
         }
     }, [rememberApiKey]);
+
+    useEffect(() => {
+        void (async () => {
+            const savedProfile = await dataService.getProfile();
+            setProfile(savedProfile);
+        })();
+    }, []);
     
-    const save = () => {
+    const save = async () => {
         if (rememberApiKey) {
             localStorage.setItem('GEMINI_API_KEY', apiKey);
         } else {
             localStorage.removeItem('GEMINI_API_KEY');
         }
-        dataService.saveProfile(profile);
+        await dataService.saveProfile(profile);
         alert('Settings Saved');
     };
 
