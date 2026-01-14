@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { HashRouter, Routes, Route, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import RadarCard from './components/RadarCard';
 import MortgageAssist from './components/MortgageAssist';
 import CommuteMode from './components/CommuteMode';
+import { authService } from './services/authService';
 import { dataService } from './services/dataService';
+import { getSupabaseClient, isSupabaseConfigured } from './services/supabaseClient';
 import { Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from './types';
 
 const Dashboard: React.FC = () => {
@@ -157,6 +160,97 @@ const Dashboard: React.FC = () => {
           })}
         </div>
       )}
+    </div>
+  );
+};
+
+const AuthScreen: React.FC = () => {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const { error: authError } = isSignUp
+        ? await authService.signUp(email, password)
+        : await authService.signInWithPassword(email, password);
+      if (authError) {
+        setError(authError.message);
+      }
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : 'Authentication failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#020617] text-slate-200 flex items-center justify-center px-6 py-12">
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[140px] pointer-events-none"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-[140px] pointer-events-none"></div>
+      <div className="relative w-full max-w-md bg-slate-900/70 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
+          <div>
+            <h1 className="text-2xl font-black text-white italic tracking-tighter">MORT</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500">Referral Ops</p>
+          </div>
+        </div>
+        <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-2">
+          {isSignUp ? 'Create your account' : 'Welcome back'}
+        </h2>
+        <p className="text-sm text-slate-400 mb-6">
+          {isSignUp ? 'Sign up to sync contacts across devices.' : 'Sign in to continue managing your referral radar.'}
+        </p>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={event => setEmail(event.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm"
+              placeholder="you@brokerage.com"
+              required
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+          {error && (
+            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            className="w-full bg-gradient-to-r from-pink-500 to-indigo-500 text-white font-black uppercase text-xs tracking-widest py-4 rounded-xl disabled:opacity-60"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Working...' : isSignUp ? 'Sign up' : 'Sign in'}
+          </button>
+        </form>
+        <button
+          type="button"
+          onClick={() => setIsSignUp(previous => !previous)}
+          className="mt-6 w-full text-slate-400 text-xs font-bold uppercase tracking-widest"
+        >
+          {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
+        </button>
+      </div>
     </div>
   );
 };
@@ -616,6 +710,7 @@ const Settings: React.FC = () => {
     const [apiKey, setApiKey] = useState(storedApiKey);
     const [rememberApiKey, setRememberApiKey] = useState(Boolean(storedApiKey));
     const [profile, setProfile] = useState<RealtorProfile>({ name: 'Agent' });
+    const supabaseEnabled = isSupabaseConfigured();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -659,6 +754,15 @@ const Settings: React.FC = () => {
       }
     };
 
+    const handleSignOut = async () => {
+        try {
+            await authService.signOut();
+        } catch (error) {
+            console.warn('Failed to sign out', error);
+            alert('Unable to sign out right now.');
+        }
+    };
+
     return (
         <div className="max-w-md mx-auto p-6 pb-24">
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-8">Preferences</h1>
@@ -699,6 +803,17 @@ const Settings: React.FC = () => {
                    </label>
                    <button onClick={save} className="w-full bg-indigo-600 text-white font-black uppercase text-xs py-4 rounded-xl">Save Preferences</button>
                 </section>
+                {supabaseEnabled && (
+                    <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-4">
+                        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Account</h2>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            Sign out to switch accounts or end your session on this device.
+                        </p>
+                        <button onClick={handleSignOut} className="w-full bg-slate-900 text-white font-black uppercase text-xs py-4 rounded-xl border border-white/10">
+                            Sign out
+                        </button>
+                    </section>
+                )}
                 <button onClick={handleReset} className="w-full text-red-500 font-black uppercase text-[10px] tracking-widest pt-4">Delete All Data</button>
             </div>
         </div>
@@ -741,13 +856,56 @@ const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
 };
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dataRefreshKey, setDataRefreshKey] = useState(0);
+  const supabaseEnabled = isSupabaseConfigured();
+
   useEffect(() => {
-    void dataService.initAuthProfile();
-  }, []);
+    if (!supabaseEnabled) {
+      setAuthLoading(false);
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setAuthLoading(false);
+      return;
+    }
+    let active = true;
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      if (error) {
+        console.warn('Failed to load session', error);
+      }
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setDataRefreshKey(prev => prev + 1);
+    });
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabaseEnabled]);
+
+  if (supabaseEnabled) {
+    if (authLoading) {
+      return (
+        <div className="min-h-screen bg-[#020617] text-slate-200 flex items-center justify-center">
+          <div className="text-xs font-bold uppercase tracking-[0.4em] text-slate-500">Loading...</div>
+        </div>
+      );
+    }
+    if (!session) {
+      return <AuthScreen />;
+    }
+  }
 
   return (
     <HashRouter>
-      <Layout>
+      <Layout key={dataRefreshKey}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />

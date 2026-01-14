@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BrainDumpClient, Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from '../types';
+import { authService } from './authService';
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
 
 const STORAGE_KEYS = {
@@ -119,12 +120,22 @@ const getSupabaseUserId = async (supabase: SupabaseClient): Promise<string | nul
   return data.user?.id ?? null;
 };
 
-const getAgentId = () => {
+const getLocalAgentId = () => {
   const existing = localStorage.getItem(STORAGE_KEYS.AGENT_ID);
   if (existing) return existing;
   const next = uuid();
   localStorage.setItem(STORAGE_KEYS.AGENT_ID, next);
   return next;
+};
+
+const getAuthenticatedUserId = async () => {
+  const session = await authService.getSession();
+  const userId = session?.user?.id;
+  if (!userId) {
+    console.warn('Supabase session missing; user must be authenticated.');
+    return null;
+  }
+  return userId;
 };
 
 const normalizeContact = (contact: Contact): Contact => ({
@@ -302,6 +313,7 @@ export const dataService = {
     });
 
     if (supabase) {
+      if (!agentId) return payload;
       const { data: inserted, error } = await supabase
         .from('contacts')
         .insert(payload)
@@ -326,7 +338,7 @@ export const dataService = {
     save(STORAGE_KEYS.CONTACTS, contacts);
 
     const radarStates = load<RadarState>(STORAGE_KEYS.RADAR);
-    radarStates.push(defaultRadarState(payload.id, agentId));
+    radarStates.push(defaultRadarState(payload.id, agentId ?? getLocalAgentId()));
     save(STORAGE_KEYS.RADAR, radarStates);
 
     return payload;
@@ -413,6 +425,7 @@ export const dataService = {
     };
 
     if (supabase) {
+      if (!agentId) return;
       const { error } = await supabase.from('contact_notes').insert(note);
       if (error) {
         console.warn('Failed to add note', error);
@@ -548,6 +561,7 @@ export const dataService = {
     };
 
     if (supabase) {
+      if (!agentId) return;
       const { error } = await supabase.from('touches').insert(touch);
       if (error) {
         console.warn('Failed to add touch', error);
