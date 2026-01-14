@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { HashRouter, Routes, Route, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import RadarCard from './components/RadarCard';
 import MortgageAssist from './components/MortgageAssist';
 import CommuteMode from './components/CommuteMode';
+import AuthPanel from './components/AuthPanel';
 import { dataService } from './services/dataService';
+import { getSupabaseClient } from './services/supabaseClient';
 import { Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from './types';
 
 const Dashboard: React.FC = () => {
@@ -741,13 +744,42 @@ const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
 };
 
 export default function App() {
+  const supabase = getSupabaseClient();
+  const [session, setSession] = useState<Session | null>(null);
+
   useEffect(() => {
-    void dataService.initAuthProfile();
-  }, []);
+    if (!supabase) return;
+    void supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+  };
 
   return (
     <HashRouter>
       <Layout>
+        {session ? (
+          <div className="max-w-2xl mx-auto px-6 pb-6 flex justify-end">
+            <button
+              onClick={handleSignOut}
+              className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <AuthPanel supabase={supabase} />
+        )}
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
