@@ -741,6 +741,10 @@ const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
 };
 
 export default function App() {
+  useEffect(() => {
+    void dataService.initAuthProfile();
+  }, []);
+
   return (
     <HashRouter>
       <Layout>
