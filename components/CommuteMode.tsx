@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { processBrainDump } from '../services/geminiService';
+import { processBrainDump } from '../services/openaiService';
 import { dataService } from '../services/dataService';
 
 const CommuteMode: React.FC = () => {

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Contact, ContactNote, GeneratedMessage, RadarState } from '../types';
-import { generateRadarMessage, determineAngle } from '../services/geminiService';
+import { generateRadarMessage, determineAngle } from '../services/openaiService';
 import { dataService } from '../services/dataService';
 
 interface RadarCardProps {

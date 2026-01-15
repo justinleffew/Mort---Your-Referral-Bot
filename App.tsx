@@ -615,7 +615,7 @@ const ContactsList: React.FC = () => {
 };
 
 const Settings: React.FC = () => {
-    const storedApiKey = localStorage.getItem('GEMINI_API_KEY') || '';
+    const storedApiKey = localStorage.getItem('OPENAI_SECRET_KEY') || '';
     const [apiKey, setApiKey] = useState(storedApiKey);
     const [rememberApiKey, setRememberApiKey] = useState(Boolean(storedApiKey));
     const [profile, setProfile] = useState<RealtorProfile>({ name: 'Agent' });
@@ -623,7 +623,7 @@ const Settings: React.FC = () => {
 
     useEffect(() => {
         if (!rememberApiKey) {
-            localStorage.removeItem('GEMINI_API_KEY');
+            localStorage.removeItem('OPENAI_SECRET_KEY');
         }
     }, [rememberApiKey]);
 
@@ -636,9 +636,9 @@ const Settings: React.FC = () => {
     
     const save = async () => {
         if (rememberApiKey) {
-            localStorage.setItem('GEMINI_API_KEY', apiKey);
+            localStorage.setItem('OPENAI_SECRET_KEY', apiKey);
         } else {
-            localStorage.removeItem('GEMINI_API_KEY');
+            localStorage.removeItem('OPENAI_SECRET_KEY');
         }
         await dataService.saveProfile(profile);
         alert('Settings Saved');
@@ -690,7 +690,7 @@ const Settings: React.FC = () => {
                         Your API key can be saved in localStorage for quick access, but it is stored in plain text on this browser.
                         Avoid enabling it on shared or public devices.
                    </p>
-                   <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 text-white text-sm" placeholder="Gemini API Key" />
+                   <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 text-white text-sm" placeholder="OpenAI API Key" />
                    <label className="flex items-center justify-between gap-4 rounded-2xl border border-white/5 bg-slate-900/50 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-400">
                         <span>Remember API key on this device</span>
                         <input
