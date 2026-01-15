@@ -77,6 +77,8 @@ export interface MortgageQueryResponse {
 export interface RealtorProfile {
   name: string;
   headshot?: string; // base64
+  cadence_type?: 'weekly' | 'monthly' | 'quarterly' | 'custom';
+  cadence_custom_days?: number;
 }
 
 export type RadarAngle = 'friendly_checkin' | 'interest_based' | 'time_since_contact' | 'homeownership_milestone' | 'light_value_framing' | 'equity_opportunity';

@@ -10,9 +10,41 @@ import { dataService } from './services/dataService';
 import { getSupabaseClient } from './services/supabaseClient';
 import { Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from './types';
 
+const DEFAULT_CADENCE_DAYS = 90;
+const DEFAULT_PROFILE: RealtorProfile = {
+  name: 'Agent',
+  cadence_type: 'quarterly',
+  cadence_custom_days: DEFAULT_CADENCE_DAYS,
+};
+
+const getCadenceDays = (profile?: RealtorProfile) => {
+  const cadenceType = profile?.cadence_type ?? DEFAULT_PROFILE.cadence_type;
+  if (cadenceType === 'weekly') return 7;
+  if (cadenceType === 'monthly') return 30;
+  if (cadenceType === 'custom') {
+    const customDays = profile?.cadence_custom_days ?? DEFAULT_CADENCE_DAYS;
+    return customDays > 0 ? customDays : DEFAULT_CADENCE_DAYS;
+  }
+  return DEFAULT_CADENCE_DAYS;
+};
+
+const getCadenceLabel = (profile?: RealtorProfile, cadenceDays?: number) => {
+  const cadenceType = profile?.cadence_type ?? DEFAULT_PROFILE.cadence_type;
+  if (cadenceType === 'weekly') return 'Weekly';
+  if (cadenceType === 'monthly') return 'Monthly';
+  if (cadenceType === 'custom') {
+    const days = cadenceDays ?? getCadenceDays(profile);
+    return `Custom (${days} days)`;
+  }
+  return 'Quarterly';
+};
+
 const Dashboard: React.FC = () => {
   const [radarItems, setRadarItems] = useState<Array<{ contact: Contact; notes: ContactNote[]; state: RadarState }>>([]);
   const [stats, setStats] = useState({ total: 0, withInterests: 0, percent: 0 });
+  const [dueThisWeekCount, setDueThisWeekCount] = useState(0);
+  const [cadenceDays, setCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
+  const [cadenceLabel, setCadenceLabel] = useState(getCadenceLabel(DEFAULT_PROFILE));
   const [showAddMenu, setShowAddMenu] = useState(false);
   const navigate = useNavigate();
 
@@ -21,9 +53,18 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const refreshRadar = async () => {
-    const eligible = (await dataService.getEligibleContacts()).slice(0, 5);
+    const profile = await dataService.getProfile();
+    const cadenceDaysValue = getCadenceDays(profile);
+    setCadenceDays(cadenceDaysValue);
+    setCadenceLabel(getCadenceLabel(profile, cadenceDaysValue));
+    const [eligible, contacts, radarStates] = await Promise.all([
+      dataService.getEligibleContacts(),
+      dataService.getContacts(),
+      dataService.getRadarStates(),
+    ]);
+    const limitedEligible = eligible.slice(0, 5);
     const items = await Promise.all(
-      eligible.map(async contact => {
+      limitedEligible.map(async contact => {
         const [notes, state] = await Promise.all([
           dataService.getNotes(contact.id),
           dataService.getRadarState(contact.id),
@@ -42,23 +83,45 @@ const Dashboard: React.FC = () => {
       })
     );
     setRadarItems(items);
+    const today = new Date();
+    const endOfWeek = new Date();
+    endOfWeek.setDate(today.getDate() + 7);
+    const dueThisWeek = contacts.filter(contact => {
+      if (contact.archived) return false;
+      const state = radarStates.find(r => r.contact_id === contact.id);
+      if (state?.suppressed_until && new Date(state.suppressed_until) > endOfWeek) return false;
+      if (contact.suggested_action && !state?.last_prompt_shown_at) return true;
+
+      const baseDateValue = contact.last_contacted_at || contact.sale_date;
+      if (!baseDateValue) return true;
+      const baseDate = new Date(baseDateValue);
+      if (Number.isNaN(baseDate.getTime())) return true;
+      const dueDate = new Date(baseDate);
+      dueDate.setDate(dueDate.getDate() + cadenceDaysValue);
+      return dueDate <= endOfWeek;
+    }).length;
+    setDueThisWeekCount(dueThisWeek);
     const latestStats = await dataService.getStats();
     setStats(latestStats);
   };
 
   const handleReachedOut = async (contactId: string) => {
+    const suppressUntil = new Date();
+    suppressUntil.setDate(suppressUntil.getDate() + cadenceDays);
     await dataService.addTouch(contactId, 'text', { channel: 'sms', source: 'radar' });
     await dataService.updateRadarState(contactId, {
       reached_out: true,
       reached_out_at: new Date().toISOString(),
-      suppressed_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      suppressed_until: suppressUntil.toISOString().split('T')[0]
     });
     await refreshRadar();
   };
 
   const handleDismiss = async (contactId: string) => {
+    const suppressUntil = new Date();
+    suppressUntil.setDate(suppressUntil.getDate() + cadenceDays);
     await dataService.updateRadarState(contactId, {
-      suppressed_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      suppressed_until: suppressUntil.toISOString().split('T')[0]
     });
     await refreshRadar();
   };
@@ -122,8 +185,11 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="flex justify-between items-center mb-6 px-2">
-          <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Daily Targets</h1>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{radarItems.length} Opportunity Found</span>
+          <div>
+            <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Due This Week</h1>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cadence: {cadenceLabel}</p>
+          </div>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{dueThisWeekCount} Due</span>
       </div>
       
       {radarItems.length === 0 ? (
@@ -436,7 +502,7 @@ const Calculator: React.FC = () => {
   const [rate, setRate] = useState<number>(6.5);
   const [taxes, setTaxes] = useState<number>(6000);
   const [showMode, setShowMode] = useState(false);
-  const [profile, setProfile] = useState<RealtorProfile>({ name: 'Agent' });
+  const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
 
   useEffect(() => {
     void (async () => {
@@ -618,7 +684,7 @@ const Settings: React.FC = () => {
     const storedApiKey = localStorage.getItem('OPENAI_SECRET_KEY') || '';
     const [apiKey, setApiKey] = useState(storedApiKey);
     const [rememberApiKey, setRememberApiKey] = useState(Boolean(storedApiKey));
-    const [profile, setProfile] = useState<RealtorProfile>({ name: 'Agent' });
+    const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -662,6 +728,25 @@ const Settings: React.FC = () => {
       }
     };
 
+    const cadenceOptions = [
+      { value: 'weekly', label: 'Weekly', description: 'Every 7 days' },
+      { value: 'monthly', label: 'Monthly', description: 'Every 30 days' },
+      { value: 'quarterly', label: 'Quarterly', description: 'Every 90 days' },
+      { value: 'custom', label: 'Custom', description: 'Pick your own cadence' },
+    ] as const;
+
+    const handleCadenceChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const nextType = event.target.value as RealtorProfile['cadence_type'];
+      setProfile(prev => ({
+        ...prev,
+        cadence_type: nextType,
+        cadence_custom_days:
+          nextType === 'custom'
+            ? prev.cadence_custom_days ?? 30
+            : prev.cadence_custom_days ?? DEFAULT_CADENCE_DAYS,
+      }));
+    };
+
     return (
         <div className="max-w-md mx-auto p-6 pb-24">
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-8">Preferences</h1>
@@ -683,6 +768,41 @@ const Settings: React.FC = () => {
                         <input type="text" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm" />
                       </div>
                     </div>
+                </section>
+                <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
+                   <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Touch Cadence</h2>
+                   <p className="text-xs text-slate-400 leading-relaxed">
+                        Choose how often you want follow-ups. This cadence drives radar eligibility and the due-this-week count.
+                   </p>
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cadence</label>
+                   <select
+                      value={profile.cadence_type ?? DEFAULT_PROFILE.cadence_type}
+                      onChange={handleCadenceChange}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm"
+                    >
+                      {cadenceOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label} — {option.description}
+                        </option>
+                      ))}
+                   </select>
+                   {profile.cadence_type === 'custom' && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Custom days</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={profile.cadence_custom_days ?? 30}
+                          onChange={event =>
+                            setProfile(prev => ({
+                              ...prev,
+                              cadence_custom_days: Math.max(1, Number(event.target.value)),
+                            }))
+                          }
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm"
+                        />
+                      </div>
+                   )}
                 </section>
                 <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">AI Engine</h2>
