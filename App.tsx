@@ -1042,6 +1042,29 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) return;
+    const handleAuthCallback = async () => {
+      const hash = window.location.hash;
+      const hashQuery = hash.includes('?') ? hash.split('?')[1] : '';
+      const queryParams = new URLSearchParams(hashQuery || window.location.search);
+      const authCode = queryParams.get('code');
+      const authError = queryParams.get('error');
+      const authErrorDescription = queryParams.get('error_description');
+      if (authError) {
+        console.warn('Supabase auth error:', authError, authErrorDescription);
+      }
+      if (!authCode) return;
+      const { error } = await supabase.auth.exchangeCodeForSession(authCode);
+      if (error) {
+        console.warn('Failed to exchange auth code', error);
+      }
+      const cleanedHash = hash.includes('?') ? hash.split('?')[0] : hash;
+      window.history.replaceState(
+        {},
+        document.title,
+        `${window.location.origin}${window.location.pathname}${window.location.search}${cleanedHash}`
+      );
+    };
+    void handleAuthCallback();
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
     });

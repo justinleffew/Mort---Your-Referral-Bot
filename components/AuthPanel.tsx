@@ -17,7 +17,12 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
     setIsSubmitting(true);
     setError(null);
     setMessage(null);
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+    const emailRedirectTo = `${window.location.origin}/#/auth/callback`;
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo },
+    });
     if (signUpError) {
       setError(signUpError.message);
     } else if (data.user && !data.session) {
