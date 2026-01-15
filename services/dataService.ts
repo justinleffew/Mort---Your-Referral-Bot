@@ -1,4 +1,3 @@
-import { SupabaseClient } from '@supabase/supabase-js';
 import { BrainDumpClient, Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from '../types';
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
 
@@ -110,10 +109,11 @@ const ensureAuthProfile = async (nameOverride?: string) => {
   await upsertProfileForUser(user, nameOverride);
 };
 
-const getSupabaseUserId = async (supabase: SupabaseClient): Promise<string | null> => {
+const getSupabaseUserId = async (supabase: ReturnType<typeof getSupabaseClient>) => {
+  if (!supabase) return null;
   const { data, error } = await supabase.auth.getUser();
   if (error) {
-    console.warn('Failed to load authenticated user', error);
+    console.warn('Failed to load Supabase user', error);
     return null;
   }
   return data.user?.id ?? null;
@@ -125,16 +125,6 @@ const getAgentId = () => {
   const next = uuid();
   localStorage.setItem(STORAGE_KEYS.AGENT_ID, next);
   return next;
-};
-
-const getSupabaseUserId = async (supabase: ReturnType<typeof getSupabaseClient>) => {
-  if (!supabase) return null;
-  const { data, error } = await supabase.auth.getUser();
-  if (error) {
-    console.warn('Failed to load Supabase user', error);
-    return null;
-  }
-  return data.user?.id ?? null;
 };
 
 const normalizeContact = (contact: Contact): Contact => ({
@@ -168,36 +158,22 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
+      // Supabase mode.
       const { data, error } = await supabase
         .from('realtor_profiles')
         .select('*')
         .eq('user_id', userId)
-    if (supabase) {
-      const user = await getAuthUser();
-      if (user) {
-        const { data, error } = await supabase
-          .from('realtor_profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (error) {
-          console.warn('Failed to load profile', error);
-        }
-        if (data) {
-          return { name: data.name, headshot: data.headshot };
-        }
-        return { name: resolveProfileName(undefined, user.user_metadata) };
-      }
-      const { data, error } = await supabase
-        .from('realtor_profiles')
-        .select('*')
-        .eq('user_id', getAgentId())
         .maybeSingle();
       if (error) {
         console.warn('Failed to load profile', error);
       }
-      return data ? { name: data.name, headshot: data.headshot } : { name: DEFAULT_PROFILE_NAME };
+      if (data) {
+        return { name: data.name, headshot: data.headshot };
+      }
+      return { name: DEFAULT_PROFILE_NAME };
     }
+
+    // LocalStorage fallback.
     return loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE) || { name: DEFAULT_PROFILE_NAME };
   },
 
@@ -205,23 +181,9 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
+      // Supabase mode.
       const { error } = await supabase.from('realtor_profiles').upsert({
         user_id: userId,
-    if (supabase) {
-      const user = await getAuthUser();
-      if (user) {
-        const { error } = await supabase.from('realtor_profiles').upsert({
-          user_id: user.id,
-          name: profile.name,
-          headshot: profile.headshot ?? null,
-        });
-        if (error) {
-          console.warn('Failed to save profile', error);
-        }
-        return;
-      }
-      const { error } = await supabase.from('realtor_profiles').upsert({
-        user_id: getAgentId(),
         name: profile.name,
         headshot: profile.headshot ?? null,
       });
@@ -230,6 +192,8 @@ export const dataService = {
       }
       return;
     }
+
+    // LocalStorage fallback.
     save(STORAGE_KEYS.PROFILE, profile);
   },
 
@@ -237,12 +201,7 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
-    if (supabase) {
-      const userId = await getSupabaseUserId(supabase);
-      if (!userId) {
-        console.warn('No authenticated user available for contacts load');
-        return [];
-      }
+      // Supabase mode.
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
@@ -254,6 +213,8 @@ export const dataService = {
       }
       return (data || []).map(normalizeContact);
     }
+
+    // LocalStorage fallback.
     return load<Contact>(STORAGE_KEYS.CONTACTS).filter(c => !c.archived).map(normalizeContact);
   },
 
@@ -261,12 +222,7 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
-    if (supabase) {
-      const userId = await getSupabaseUserId(supabase);
-      if (!userId) {
-        console.warn('No authenticated user available for contact lookup');
-        return null;
-      }
+      // Supabase mode.
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
@@ -279,38 +235,18 @@ export const dataService = {
       }
       return data ? normalizeContact(data) : null;
     }
+
+    // LocalStorage fallback.
     const contact = load<Contact>(STORAGE_KEYS.CONTACTS).find(c => c.id === id);
     return contact ? normalizeContact(contact) : null;
   },
 
   addContact: async (data: Partial<Contact>): Promise<Contact> => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
-    const localAgentId = getAgentId();
-    const payload: Contact = normalizeContact({
-      id: uuid(),
-      user_id: localAgentId,
     const agentId = getAgentId();
-    const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
+    const userId = await getSupabaseUserId(supabase);
     if (supabase && !userId) {
       console.warn('No authenticated user available for contact insert');
-      return normalizeContact({
-        id: uuid(),
-        user_id: agentId,
-        full_name: data.full_name || 'Unknown',
-        phone: data.phone || '',
-        email: data.email || '',
-        location_context: data.location_context || '',
-        sale_date: data.sale_date,
-        last_contacted_at: data.last_contacted_at,
-        comfort_level: data.comfort_level || 'maybe',
-        archived: false,
-        created_at: new Date().toISOString(),
-        radar_interests: data.radar_interests || [],
-        family_details: data.family_details || { children: [], pets: [] },
-        mortgage_inference: data.mortgage_inference,
-        suggested_action: data.suggested_action,
-      });
     }
     const payload: Contact = normalizeContact({
       id: uuid(),
@@ -331,6 +267,7 @@ export const dataService = {
     });
 
     if (supabase && userId) {
+      // Supabase mode.
       const supabasePayload = { ...payload, user_id: userId };
       const { data: inserted, error } = await supabase
         .from('contacts')
@@ -351,12 +288,13 @@ export const dataService = {
       return normalizeContact(inserted);
     }
 
+    // LocalStorage fallback.
     const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
     contacts.push(payload);
     save(STORAGE_KEYS.CONTACTS, contacts);
 
     const radarStates = load<RadarState>(STORAGE_KEYS.RADAR);
-    radarStates.push(defaultRadarState(payload.id, localAgentId));
+    radarStates.push(defaultRadarState(payload.id, agentId));
     save(STORAGE_KEYS.RADAR, radarStates);
 
     return payload;
@@ -383,25 +321,19 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
+      // Supabase mode.
       const { error } = await supabase
         .from('contacts')
         .update({ ...data, user_id: userId })
         .eq('id', id)
         .eq('user_id', userId);
-    if (supabase) {
-      const userId = await getSupabaseUserId(supabase);
-      if (!userId) {
-        console.warn('No authenticated user available for contact update');
-        return;
-      }
-      const payload = { ...data, user_id: userId };
-      const { error } = await supabase.from('contacts').update(payload).eq('id', id).eq('user_id', userId);
       if (error) {
         console.warn('Failed to update contact', error);
       }
       return;
     }
 
+    // LocalStorage fallback.
     const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
     const index = contacts.findIndex(c => c.id === id);
     if (index !== -1) {
@@ -414,12 +346,7 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
-    if (supabase) {
-      const userId = await getSupabaseUserId(supabase);
-      if (!userId) {
-        console.warn('No authenticated user available for notes load');
-        return [];
-      }
+      // Supabase mode.
       const { data, error } = await supabase
         .from('contact_notes')
         .select('*')
@@ -432,22 +359,17 @@ export const dataService = {
       }
       return data || [];
     }
+
+    // LocalStorage fallback.
     return load<ContactNote>(STORAGE_KEYS.NOTES).filter(n => n.contact_id === contactId);
   },
 
   addNote: async (contactId: string, text: string) => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
-    const localAgentId = getAgentId();
-    const note: ContactNote = {
-      id: uuid(),
-      contact_id: contactId,
-      user_id: localAgentId,
     const agentId = getAgentId();
-    const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
+    const userId = await getSupabaseUserId(supabase);
     if (supabase && !userId) {
       console.warn('No authenticated user available for note insert');
-      return;
     }
     const note: ContactNote = {
       id: uuid(),
@@ -458,6 +380,7 @@ export const dataService = {
     };
 
     if (supabase && userId) {
+      // Supabase mode.
       const { error } = await supabase.from('contact_notes').insert({ ...note, user_id: userId });
       if (error) {
         console.warn('Failed to add note', error);
@@ -465,6 +388,7 @@ export const dataService = {
       return;
     }
 
+    // LocalStorage fallback.
     const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
     notes.push(note);
     save(STORAGE_KEYS.NOTES, notes);
@@ -474,12 +398,7 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
-    if (supabase) {
-      const userId = await getSupabaseUserId(supabase);
-      if (!userId) {
-        console.warn('No authenticated user available for radar state load');
-        return null;
-      }
+      // Supabase mode.
       const { data, error } = await supabase
         .from('radar_state')
         .select('*')
@@ -495,6 +414,8 @@ export const dataService = {
       await supabase.from('radar_state').insert(fallback);
       return fallback;
     }
+
+    // LocalStorage fallback.
     return load<RadarState>(STORAGE_KEYS.RADAR).find(r => r.contact_id === contactId) || null;
   },
 
@@ -502,12 +423,7 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
-    if (supabase) {
-      const userId = await getSupabaseUserId(supabase);
-      if (!userId) {
-        console.warn('No authenticated user available for radar state update');
-        return;
-      }
+      // Supabase mode.
       const { data: existing, error: loadError } = await supabase
         .from('radar_state')
         .select('*')
@@ -534,6 +450,7 @@ export const dataService = {
       return;
     }
 
+    // LocalStorage fallback.
     const states = load<RadarState>(STORAGE_KEYS.RADAR);
     const index = states.findIndex(r => r.contact_id === contactId);
     if (index !== -1) {
@@ -554,12 +471,7 @@ export const dataService = {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
-    if (supabase) {
-      const userId = await getSupabaseUserId(supabase);
-      if (!userId) {
-        console.warn('No authenticated user available for touches load');
-        return [];
-      }
+      // Supabase mode.
       const { data, error } = await supabase
         .from('touches')
         .select('*')
@@ -572,6 +484,8 @@ export const dataService = {
       }
       return data || [];
     }
+
+    // LocalStorage fallback.
     return load<Touch>(STORAGE_KEYS.TOUCHES).filter(t => t.contact_id === contactId);
   },
 
@@ -581,17 +495,10 @@ export const dataService = {
     options?: { channel?: string; body?: string; source?: string }
   ) => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
-    const localAgentId = getAgentId();
-    const touch: Touch = {
-      id: uuid(),
-      contact_id: contactId,
-      user_id: localAgentId,
     const agentId = getAgentId();
-    const userId = supabase ? await getSupabaseUserId(supabase) : agentId;
+    const userId = await getSupabaseUserId(supabase);
     if (supabase && !userId) {
       console.warn('No authenticated user available for touch insert');
-      return;
     }
     const touch: Touch = {
       id: uuid(),
@@ -605,6 +512,7 @@ export const dataService = {
     };
 
     if (supabase && userId) {
+      // Supabase mode.
       const { error } = await supabase.from('touches').insert({ ...touch, user_id: userId });
       if (error) {
         console.warn('Failed to add touch', error);
@@ -617,6 +525,7 @@ export const dataService = {
       return;
     }
 
+    // LocalStorage fallback.
     const touches = load<Touch>(STORAGE_KEYS.TOUCHES);
     touches.push(touch);
     save(STORAGE_KEYS.TOUCHES, touches);
@@ -640,48 +549,45 @@ export const dataService = {
     const userId = await getSupabaseUserId(supabase);
     let radarStates: RadarState[] = [];
     if (supabase && userId) {
-    let radarStates: RadarState[] = [];
-    if (supabase) {
-      const userId = await getSupabaseUserId(supabase);
-      if (!userId) {
-        console.warn('No authenticated user available for radar state eligibility load');
-        return [];
-      }
+      // Supabase mode.
       const { data, error } = await supabase.from('radar_state').select('*').eq('user_id', userId);
       if (error) {
         console.warn('Failed to load radar states', error);
       }
       radarStates = data || [];
     } else {
+      // LocalStorage fallback.
       radarStates = load<RadarState>(STORAGE_KEYS.RADAR);
     }
 
     const today = new Date();
-    return contacts.filter(contact => {
-      if (contact.archived) return false;
-      const state = radarStates.find(r => r.contact_id === contact.id);
-      if (!state) return true;
-      if (state.suppressed_until && new Date(state.suppressed_until) > today) return false;
+    return contacts
+      .filter(contact => {
+        if (contact.archived) return false;
+        const state = radarStates.find(r => r.contact_id === contact.id);
+        if (!state) return true;
+        if (state.suppressed_until && new Date(state.suppressed_until) > today) return false;
 
-      if (contact.suggested_action && !state.last_prompt_shown_at) return true;
+        if (contact.suggested_action && !state.last_prompt_shown_at) return true;
 
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
-      const lastContactDate = contact.last_contacted_at ? new Date(contact.last_contacted_at) : null;
-      const saleDate = contact.sale_date ? new Date(contact.sale_date) : null;
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
+        const lastContactDate = contact.last_contacted_at ? new Date(contact.last_contacted_at) : null;
+        const saleDate = contact.sale_date ? new Date(contact.sale_date) : null;
 
-      if (lastContactDate) {
-        return lastContactDate <= threeMonthsAgo;
-      }
-      if (saleDate) {
-        return saleDate <= threeMonthsAgo;
-      }
-      return true;
-    }).sort((a, b) => {
-      const aScore = (a.suggested_action ? 100 : 0) + (a.radar_interests.length * 10);
-      const bScore = (b.suggested_action ? 100 : 0) + (b.radar_interests.length * 10);
-      return bScore - aScore;
-    });
+        if (lastContactDate) {
+          return lastContactDate <= threeMonthsAgo;
+        }
+        if (saleDate) {
+          return saleDate <= threeMonthsAgo;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aScore = (a.suggested_action ? 100 : 0) + a.radar_interests.length * 10;
+        const bScore = (b.suggested_action ? 100 : 0) + b.radar_interests.length * 10;
+        return bScore - aScore;
+      });
   },
 
   bulkImport: async (rows: any[]) => {
