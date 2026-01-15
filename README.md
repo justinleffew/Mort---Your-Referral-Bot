@@ -17,6 +17,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1_XLE-ICPkgAeN1oo_OrMej
    `npm install`
 2. Create a `.env.local` file using `.env.example` as a template.
    - Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for your Supabase project.
+   - The app will not use Supabase unless both variables are set.
    - Set the `VITE_GEMINI_API_KEY` in `.env.local` to your Gemini API key.
    - The app uses the `GEMINI_API_KEY` value from `localStorage` first (set in-app), then falls back to `VITE_GEMINI_API_KEY`.
 3. Run the app:
