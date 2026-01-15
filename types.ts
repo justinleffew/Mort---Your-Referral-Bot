@@ -21,6 +21,8 @@ export interface Contact {
   location_context?: string;
   sale_date?: string; // ISO date string
   last_contacted_at?: string; // ISO date string
+  segment?: string;
+  tags?: string[];
   comfort_level: ComfortLevel;
   archived: boolean;
   created_at: string;
