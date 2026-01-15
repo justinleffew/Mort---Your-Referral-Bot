@@ -62,6 +62,11 @@ const loadObject = <T>(key: string): T | null => {
 
 const uuid = () => crypto.randomUUID();
 const DEFAULT_PROFILE_NAME = 'Agent';
+const DEFAULT_CADENCE_DAYS = 90;
+const DEFAULT_PROFILE_CADENCE = {
+  cadence_type: 'quarterly' as const,
+  cadence_custom_days: DEFAULT_CADENCE_DAYS,
+};
 let authProfileInitialized = false;
 
 const resolveProfileName = (userName?: string, metadata?: Record<string, any>) => {
@@ -71,6 +76,25 @@ const resolveProfileName = (userName?: string, metadata?: Record<string, any>) =
   if (typeof metaName === 'string' && metaName.trim()) return metaName.trim();
   return DEFAULT_PROFILE_NAME;
 };
+
+const resolveCadenceDays = (profile?: RealtorProfile) => {
+  const cadenceType = profile?.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type;
+  if (cadenceType === 'weekly') return 7;
+  if (cadenceType === 'monthly') return 30;
+  if (cadenceType === 'custom') {
+    const customDays = profile?.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days;
+    return customDays > 0 ? customDays : DEFAULT_CADENCE_DAYS;
+  }
+  return DEFAULT_CADENCE_DAYS;
+};
+
+const withProfileDefaults = (profile?: RealtorProfile | null): RealtorProfile => ({
+  name: profile?.name ?? DEFAULT_PROFILE_NAME,
+  headshot: profile?.headshot ?? undefined,
+  cadence_type: profile?.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
+  cadence_custom_days:
+    profile?.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
+});
 
 const getAuthUser = async () => {
   const supabase = getSupabaseClient();
@@ -92,6 +116,8 @@ const upsertProfileForUser = async (user: { id: string; user_metadata?: Record<s
       user_id: user.id,
       name,
       headshot: null,
+      cadence_type: DEFAULT_PROFILE_CADENCE.cadence_type,
+      cadence_custom_days: DEFAULT_PROFILE_CADENCE.cadence_custom_days,
     },
     {
       onConflict: 'user_id',
@@ -168,13 +194,18 @@ export const dataService = {
         console.warn('Failed to load profile', error);
       }
       if (data) {
-        return { name: data.name, headshot: data.headshot };
+        return withProfileDefaults({
+          name: data.name,
+          headshot: data.headshot ?? undefined,
+          cadence_type: data.cadence_type ?? undefined,
+          cadence_custom_days: data.cadence_custom_days ?? undefined,
+        });
       }
-      return { name: DEFAULT_PROFILE_NAME };
+      return withProfileDefaults({ name: DEFAULT_PROFILE_NAME });
     }
 
     // LocalStorage fallback.
-    return loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE) || { name: DEFAULT_PROFILE_NAME };
+    return withProfileDefaults(loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE));
   },
 
   saveProfile: async (profile: RealtorProfile) => {
@@ -186,6 +217,8 @@ export const dataService = {
         user_id: userId,
         name: profile.name,
         headshot: profile.headshot ?? null,
+        cadence_type: profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
+        cadence_custom_days: profile.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
       });
       if (error) {
         console.warn('Failed to save profile', error);
@@ -590,6 +623,8 @@ export const dataService = {
 
   getEligibleContacts: async (): Promise<Contact[]> => {
     const contacts = await dataService.getContacts();
+    const profile = await dataService.getProfile();
+    const cadenceDays = resolveCadenceDays(profile);
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     let radarStates: RadarState[] = [];
@@ -615,16 +650,16 @@ export const dataService = {
 
         if (contact.suggested_action && !state.last_prompt_shown_at) return true;
 
-        const threeMonthsAgo = new Date();
-        threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
+        const cadenceCutoff = new Date();
+        cadenceCutoff.setDate(cadenceCutoff.getDate() - cadenceDays);
         const lastContactDate = contact.last_contacted_at ? new Date(contact.last_contacted_at) : null;
         const saleDate = contact.sale_date ? new Date(contact.sale_date) : null;
 
         if (lastContactDate) {
-          return lastContactDate <= threeMonthsAgo;
+          return lastContactDate <= cadenceCutoff;
         }
         if (saleDate) {
-          return saleDate <= threeMonthsAgo;
+          return saleDate <= cadenceCutoff;
         }
         return true;
       })
@@ -721,6 +756,21 @@ export const dataService = {
     const withInterests = contacts.filter(c => c.radar_interests.length > 0).length;
     const percent = total === 0 ? 0 : Math.round((withInterests / total) * 100);
     return { total, withInterests, percent };
+  },
+
+  getRadarStates: async (): Promise<RadarState[]> => {
+    const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      const { data, error } = await supabase.from('radar_state').select('*').eq('user_id', userId);
+      if (error) {
+        console.warn('Failed to load radar states', error);
+        return [];
+      }
+      return data || [];
+    }
+
+    return load<RadarState>(STORAGE_KEYS.RADAR);
   },
 
   isSupabaseEnabled: () => isSupabaseConfigured(),

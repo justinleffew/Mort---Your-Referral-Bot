@@ -55,7 +55,9 @@ create table if not exists touches (
 create table if not exists realtor_profiles (
   user_id text primary key,
   name text not null,
-  headshot text
+  headshot text,
+  cadence_type text default 'quarterly',
+  cadence_custom_days integer
 );
 
 alter table contacts enable row level security;
