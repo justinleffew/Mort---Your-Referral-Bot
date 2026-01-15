@@ -63,7 +63,10 @@ export const generateRadarMessage = async (
     notes: ContactNote[]
 ): Promise<GeneratedMessage> => {
     const ai = getAi();
-    const notesText = notes.map(n => n.note_text).join('; ');
+    const notesText = notes
+        .slice(0, 5)
+        .map(n => `${new Date(n.created_at).toLocaleDateString()}: ${n.note_text}`)
+        .join(' | ');
     const interestsText = contact.radar_interests.join(', ');
     const mortgageContext = contact.mortgage_inference
         ? `Financial Inference: ${contact.mortgage_inference.opportunity_tag} due to ${contact.mortgage_inference.reasoning}`
@@ -88,7 +91,7 @@ export const generateRadarMessage = async (
         Client: ${contact.full_name}
         Interests: ${interestsText}
         Family: ${contact.family_details.children.join(', ')}
-        Notes: ${notesText}
+        Notes (recent first): ${notesText || 'None'}
         ${mortgageContext}
         Angle: ${angle}
 

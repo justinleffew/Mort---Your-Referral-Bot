@@ -169,6 +169,8 @@ const ContactDetail: React.FC = () => {
     const navigate = useNavigate();
     const [contact, setContact] = useState<Contact | null>(null);
     const [touches, setTouches] = useState<Touch[]>([]);
+    const [notes, setNotes] = useState<ContactNote[]>([]);
+    const [noteDraft, setNoteDraft] = useState('');
     const [touchSummary, setTouchSummary] = useState<{ yearCount: number; quarterCount: number; lastTouch?: string | null }>({
         yearCount: 0,
         quarterCount: 0,
@@ -180,10 +182,7 @@ const ContactDetail: React.FC = () => {
         void (async () => {
             const data = await dataService.getContactById(id);
             if (data) setContact(data);
-            const contactTouches = await dataService.getTouches(id);
-            setTouches(contactTouches);
-            const summary = await dataService.getTouchSummary(id);
-            setTouchSummary({ ...summary, lastTouch: summary.lastTouch || null });
+            await refreshActivity(id);
         })();
     }, [id]);
 
@@ -203,11 +202,44 @@ const ContactDetail: React.FC = () => {
 
     const logTouch = async (type: TouchType) => {
         await dataService.addTouch(contact.id, type, { source: 'manual' });
-        const updatedTouches = await dataService.getTouches(contact.id);
-        setTouches(updatedTouches);
-        const summary = await dataService.getTouchSummary(contact.id);
+        await refreshActivity(contact.id);
+    };
+
+    const refreshActivity = async (contactId: string) => {
+        const [contactTouches, contactNotes, summary] = await Promise.all([
+            dataService.getTouches(contactId),
+            dataService.getNotes(contactId),
+            dataService.getTouchSummary(contactId),
+        ]);
+        setTouches(contactTouches);
+        setNotes(contactNotes);
         setTouchSummary({ ...summary, lastTouch: summary.lastTouch || null });
     };
+
+    const handleAddNote = async () => {
+        const trimmed = noteDraft.trim();
+        if (!trimmed) return;
+        await dataService.addNote(contact.id, trimmed);
+        setNoteDraft('');
+        await refreshActivity(contact.id);
+    };
+
+    const timelineItems = [
+        ...touches.map(touch => ({
+            id: `touch-${touch.id}`,
+            type: 'touch' as const,
+            created_at: touch.created_at,
+            label: touch.type,
+            detail: touch.channel || touch.source || 'Logged touch',
+        })),
+        ...notes.map(note => ({
+            id: `note-${note.id}`,
+            type: 'note' as const,
+            created_at: note.created_at,
+            label: 'Note',
+            detail: note.note_text,
+        })),
+    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return (
         <div className="max-w-md mx-auto p-6 space-y-8 pb-32">
@@ -297,14 +329,55 @@ const ContactDetail: React.FC = () => {
                             Emailed
                         </button>
                     </div>
+                </div>
+                <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Notes</p>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">{notes.length} Total</span>
+                    </div>
+                    <textarea
+                        value={noteDraft}
+                        onChange={e => setNoteDraft(e.target.value)}
+                        className="w-full min-h-[96px] bg-slate-900 border border-white/5 rounded-2xl p-4 text-sm text-white font-medium outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Log a quick note about this contact..."
+                    />
+                    <button
+                        onClick={handleAddNote}
+                        className="w-full bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-2xl shadow-lg"
+                    >
+                        Save Note
+                    </button>
                     <div className="space-y-2">
-                        {touches.length === 0 ? (
-                            <p className="text-xs text-slate-600 italic">No touches logged yet.</p>
+                        {notes.length === 0 ? (
+                            <p className="text-xs text-slate-600 italic">No notes yet.</p>
                         ) : (
-                            touches.slice(0, 5).map(touch => (
-                                <div key={touch.id} className="flex items-center justify-between text-xs text-slate-300 bg-slate-900/40 border border-white/5 rounded-xl px-3 py-2">
-                                    <span className="font-bold uppercase tracking-widest">{touch.type}</span>
-                                    <span className="text-slate-500">{new Date(touch.created_at).toLocaleDateString()}</span>
+                            notes.slice(0, 3).map(note => (
+                                <div key={note.id} className="text-xs text-slate-300 bg-slate-900/40 border border-white/5 rounded-xl px-3 py-2">
+                                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                                        {new Date(note.created_at).toLocaleDateString()}
+                                    </p>
+                                    <p className="mt-1">{note.note_text}</p>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+                <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Timeline</p>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Touches + Notes</span>
+                    </div>
+                    <div className="space-y-2">
+                        {timelineItems.length === 0 ? (
+                            <p className="text-xs text-slate-600 italic">No activity recorded yet.</p>
+                        ) : (
+                            timelineItems.slice(0, 8).map(item => (
+                                <div key={item.id} className="flex items-start justify-between gap-3 text-xs text-slate-300 bg-slate-900/40 border border-white/5 rounded-xl px-3 py-2">
+                                    <div>
+                                        <p className="font-bold uppercase tracking-widest">{item.label}</p>
+                                        <p className="text-slate-500 text-[11px] mt-1">{item.detail}</p>
+                                    </div>
+                                    <span className="text-slate-500">{new Date(item.created_at).toLocaleDateString()}</span>
                                 </div>
                             ))
                         )}

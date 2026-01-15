@@ -394,6 +394,51 @@ export const dataService = {
     save(STORAGE_KEYS.NOTES, notes);
   },
 
+  updateNote: async (noteId: string, text: string) => {
+    const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      const { error } = await supabase
+        .from('contact_notes')
+        .update({ note_text: text })
+        .eq('id', noteId)
+        .eq('user_id', userId);
+      if (error) {
+        console.warn('Failed to update note', error);
+      }
+      return;
+    }
+
+    const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
+    const index = notes.findIndex(n => n.id === noteId);
+    if (index !== -1) {
+      notes[index] = { ...notes[index], note_text: text };
+      save(STORAGE_KEYS.NOTES, notes);
+    }
+  },
+
+  deleteNote: async (noteId: string) => {
+    const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      const { error } = await supabase
+        .from('contact_notes')
+        .delete()
+        .eq('id', noteId)
+        .eq('user_id', userId);
+      if (error) {
+        console.warn('Failed to delete note', error);
+      }
+      return;
+    }
+
+    const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
+    save(
+      STORAGE_KEYS.NOTES,
+      notes.filter(n => n.id !== noteId)
+    );
+  },
+
   getRadarState: async (contactId: string): Promise<RadarState | null> => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
