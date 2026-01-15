@@ -1,17 +1,48 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
 import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient } from "../types";
 
-export const getAi = () => {
-    const localStorageKey = typeof localStorage !== 'undefined'
-        ? localStorage.getItem('GEMINI_API_KEY')
-        : null;
-    const envApiKey = import.meta.env.VITE_GEMINI_API_KEY
-        ?? process.env.GEMINI_API_KEY
+type OpenAiConfig = {
+    apiKey: string;
+};
+
+const OPENAI_MODEL = 'gpt-4o-mini';
+
+const getEnvApiKey = () => {
+    return import.meta.env.VITE_OPENAI_SECRET_KEY
+        ?? process.env.OPENAI_SECRET_KEY
+        ?? process.env.VITE_OPENAI_SECRET_KEY
         ?? process.env.API_KEY;
-    const apiKey = localStorageKey || envApiKey;
+};
+
+export const getAi = (): OpenAiConfig | null => {
+    const localStorageKey = typeof localStorage !== 'undefined'
+        ? localStorage.getItem('OPENAI_SECRET_KEY')
+        : null;
+    const apiKey = localStorageKey || getEnvApiKey();
     if (!apiKey) return null;
-    return new GoogleGenAI({ apiKey });
+    return { apiKey };
+};
+
+const callOpenAiJson = async <T>(apiKey: string, prompt: string): Promise<T> => {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: OPENAI_MODEL,
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' }
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`OpenAI request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content ?? '{}';
+    return JSON.parse(content) as T;
 };
 
 export const determineAngle = (contact: Contact, notes: ContactNote[], usedAngles: string[]): RadarAngle => {
@@ -27,15 +58,16 @@ export const determineAngle = (contact: Contact, notes: ContactNote[], usedAngle
 };
 
 export const generateRadarMessage = async (
-    contact: Contact, 
-    angle: RadarAngle, 
+    contact: Contact,
+    angle: RadarAngle,
     notes: ContactNote[]
 ): Promise<GeneratedMessage> => {
     const ai = getAi();
     const notesText = notes.map(n => n.note_text).join('; ');
     const interestsText = contact.radar_interests.join(', ');
-    const mortgageContext = contact.mortgage_inference ? 
-        `Financial Inference: ${contact.mortgage_inference.opportunity_tag} due to ${contact.mortgage_inference.reasoning}` : '';
+    const mortgageContext = contact.mortgage_inference
+        ? `Financial Inference: ${contact.mortgage_inference.opportunity_tag} due to ${contact.mortgage_inference.reasoning}`
+        : '';
 
     const firstName = contact.full_name.split(' ')[0];
     const fallbacks: Record<RadarAngle, string> = {
@@ -52,7 +84,7 @@ export const generateRadarMessage = async (
     try {
         const prompt = `
         You are an assistant for a solo real estate agent. Write a text message (SMS) to a past client.
-        
+
         Client: ${contact.full_name}
         Interests: ${interestsText}
         Family: ${contact.family_details.children.join(', ')}
@@ -71,22 +103,7 @@ export const generateRadarMessage = async (
         Output JSON: { "message": "string", "reason": "string explanation" }
         `;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        message: { type: Type.STRING },
-                        reason: { type: Type.STRING }
-                    }
-                }
-            }
-        });
-
-        const json = JSON.parse(response.text || '{}');
+        const json = await callOpenAiJson<{ message?: string; reason?: string }>(ai.apiKey, prompt);
         return {
             message: json.message || fallbacks[angle],
             reason: json.reason || "Generated from context",
@@ -111,63 +128,16 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
     1. Identify Distinct Clients. Separate them.
     2. Extract names, locations, and approx year of transaction.
     3. Extract hobbies, sports teams, kids, pets.
-    4. Infer Mortgage Opportunities: 
+    4. Infer Mortgage Opportunities:
        - 2020-2021: Assume Low Rate (<3.5%), High Equity. Tag: "HELOC / Cash-Out".
        - 2023-2024: Assume High Rate (>6.5%). Tag: "Refinance Watch".
        - 5+ Years Ago: Assume Move-up Buyer or Empty Nester.
-    
-    Output ONLY a JSON array of objects.
+
+    Output ONLY a JSON object: { "clients": [ ... ] }
     `;
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    clients: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                names: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                location_context: { type: Type.STRING },
-                                transaction_history: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        approx_year: { type: Type.STRING },
-                                        notes: { type: Type.STRING }
-                                    }
-                                },
-                                radar_interests: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                family_details: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        children: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                        pets: { type: Type.ARRAY, items: { type: Type.STRING } }
-                                    }
-                                },
-                                mortgage_inference: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        likely_rate_environment: { type: Type.STRING },
-                                        opportunity_tag: { type: Type.STRING },
-                                        reasoning: { type: Type.STRING }
-                                    }
-                                },
-                                suggested_action: { type: Type.STRING }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    });
-
     try {
-        const data = JSON.parse(response.text || '{"clients":[]}');
+        const data = await callOpenAiJson<{ clients?: BrainDumpClient[] }>(ai.apiKey, prompt);
         return data.clients || [];
     } catch (e) {
         console.error("Failed to parse brain dump", e);
@@ -185,22 +155,11 @@ export const generateMortgageResponse = async (query: string): Promise<MortgageQ
     Output JSON: buyer_script, ballpark_numbers, heads_up, next_steps.
     `;
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    buyer_script: { type: Type.STRING },
-                    ballpark_numbers: { type: Type.STRING },
-                    heads_up: { type: Type.STRING },
-                    next_steps: { type: Type.STRING }
-                }
-            }
-        }
-    });
-
-    return JSON.parse(response.text || '{}');
+    const json = await callOpenAiJson<MortgageQueryResponse>(ai.apiKey, prompt);
+    return {
+        buyer_script: json.buyer_script || '',
+        ballpark_numbers: json.ballpark_numbers || '',
+        heads_up: json.heads_up || '',
+        next_steps: json.next_steps || ''
+    };
 };
