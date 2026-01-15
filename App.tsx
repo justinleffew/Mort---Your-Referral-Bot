@@ -743,6 +743,29 @@ const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
     );
 };
 
+const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    return (
+        <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col">
+            <header className="px-8 py-8 flex items-center justify-center">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
+                    <span className="text-2xl font-black text-white italic tracking-tighter">MORT</span>
+                </div>
+            </header>
+            <main className="relative flex-1 flex items-center justify-center px-6">
+                <div className="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+                <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-cyan-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+                <div className="w-full">
+                    {children}
+                </div>
+            </main>
+            <footer className="px-6 py-6 text-center text-sm text-slate-400">
+                <span className="font-[cursive]">Brought to you by Justin Leffew at Stratton Mortgage</span>
+            </footer>
+        </div>
+    );
+};
+
 export default function App() {
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
@@ -767,8 +790,8 @@ export default function App() {
 
   return (
     <HashRouter>
-      <Layout>
-        {session ? (
+      {session ? (
+        <Layout>
           <div className="max-w-2xl mx-auto px-6 pb-6 flex justify-end">
             <button
               onClick={handleSignOut}
@@ -777,21 +800,23 @@ export default function App() {
               Sign Out
             </button>
           </div>
-        ) : (
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
+            <Route path="/commute" element={<CommuteMode />} />
+            <Route path="/contacts" element={<ContactsList />} />
+            <Route path="/contacts/add" element={<EditContact />} />
+            <Route path="/contacts/edit/:id" element={<EditContact />} />
+            <Route path="/contacts/:id" element={<ContactDetail />} />
+            <Route path="/tools" element={<Calculator />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </Layout>
+      ) : (
+        <AuthLayout>
           <AuthPanel supabase={supabase} />
-        )}
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
-          <Route path="/commute" element={<CommuteMode />} />
-          <Route path="/contacts" element={<ContactsList />} />
-          <Route path="/contacts/add" element={<EditContact />} />
-          <Route path="/contacts/edit/:id" element={<EditContact />} />
-          <Route path="/contacts/:id" element={<ContactDetail />} />
-          <Route path="/tools" element={<Calculator />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </Layout>
+        </AuthLayout>
+      )}
     </HashRouter>
   );
 }
