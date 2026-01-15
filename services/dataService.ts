@@ -131,6 +131,8 @@ const normalizeContact = (contact: Contact): Contact => ({
   ...contact,
   radar_interests: contact.radar_interests ?? [],
   family_details: contact.family_details ?? { children: [], pets: [] },
+  segment: contact.segment ?? '',
+  tags: contact.tags ?? [],
 });
 
 const defaultRadarState = (contactId: string, userId: string): RadarState => ({
@@ -257,6 +259,8 @@ export const dataService = {
       location_context: data.location_context || '',
       sale_date: data.sale_date,
       last_contacted_at: data.last_contacted_at,
+      segment: data.segment || '',
+      tags: data.tags || [],
       comfort_level: data.comfort_level || 'maybe',
       archived: false,
       created_at: new Date().toISOString(),
@@ -588,10 +592,12 @@ export const dataService = {
     return { yearCount, quarterCount, lastTouch };
   },
 
-  getEligibleContacts: async (): Promise<Contact[]> => {
+  getEligibleContacts: async (options: { boostedSegments?: string[]; segmentBoost?: number } = {}): Promise<Contact[]> => {
     const contacts = await dataService.getContacts();
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
+    const boostedSegments = (options.boostedSegments || []).map(segment => segment.toLowerCase());
+    const segmentBoost = options.segmentBoost ?? 25;
     let radarStates: RadarState[] = [];
     if (supabase && userId) {
       // Supabase mode.
@@ -629,8 +635,10 @@ export const dataService = {
         return true;
       })
       .sort((a, b) => {
-        const aScore = (a.suggested_action ? 100 : 0) + a.radar_interests.length * 10;
-        const bScore = (b.suggested_action ? 100 : 0) + b.radar_interests.length * 10;
+        const aSegmentBoost = a.segment && boostedSegments.includes(a.segment.toLowerCase()) ? segmentBoost : 0;
+        const bSegmentBoost = b.segment && boostedSegments.includes(b.segment.toLowerCase()) ? segmentBoost : 0;
+        const aScore = (a.suggested_action ? 100 : 0) + a.radar_interests.length * 10 + aSegmentBoost;
+        const bScore = (b.suggested_action ? 100 : 0) + b.radar_interests.length * 10 + bSegmentBoost;
         return bScore - aScore;
       });
   },

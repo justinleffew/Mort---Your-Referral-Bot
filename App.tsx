@@ -396,10 +396,14 @@ const EditContact: React.FC = () => {
         email: '',
         phone: '',
         radar_interests: [],
+        segment: '',
+        tags: [],
     });
     
     // Separate local string state to prevent cursor jumping issues during input
     const [interestsInput, setInterestsInput] = useState('');
+    const [tagsInput, setTagsInput] = useState('');
+    const segmentOptions = ['', 'Hot', 'Warm', 'Cold', 'Past Client', 'Referral'];
     const isEditing = Boolean(id);
 
     useEffect(() => {
@@ -409,6 +413,7 @@ const EditContact: React.FC = () => {
             if (data) {
                 setContact(data);
                 setInterestsInput(data.radar_interests.join(', '));
+                setTagsInput((data.tags || []).join(', '));
             }
         })();
     }, [id]);
@@ -422,10 +427,14 @@ const EditContact: React.FC = () => {
         const finalInterests = interestsInput.split(',')
             .map(s => s.trim())
             .filter(s => s.length > 0);
+        const finalTags = tagsInput.split(',')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
 
         const finalContact = {
             ...contact,
-            radar_interests: finalInterests
+            radar_interests: finalInterests,
+            tags: finalTags
         };
         
         if (isEditing && id) {
@@ -482,6 +491,19 @@ const EditContact: React.FC = () => {
                     />
                 </div>
                 <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Segment</label>
+                    <select
+                        value={contact.segment || ''}
+                        onChange={e => setContact({ ...contact, segment: e.target.value })}
+                        className={InputStyle}
+                    >
+                        <option value="">Unsegmented</option>
+                        {segmentOptions.filter(option => option).map(option => (
+                            <option key={option} value={option}>{option}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests (comma separated)</label>
                     <input 
                         type="text" 
@@ -489,6 +511,17 @@ const EditContact: React.FC = () => {
                         onChange={e => setInterestsInput(e.target.value)} 
                         className={InputStyle} 
                         placeholder="Golf, Hiking, Pizza"
+                        autoComplete="off"
+                    />
+                </div>
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma separated)</label>
+                    <input
+                        type="text"
+                        value={tagsInput}
+                        onChange={e => setTagsInput(e.target.value)}
+                        className={InputStyle}
+                        placeholder="Investor, Repeat Client"
                         autoComplete="off"
                     />
                 </div>
@@ -591,6 +624,8 @@ const Calculator: React.FC = () => {
 const ContactsList: React.FC = () => {
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [segmentFilter, setSegmentFilter] = useState('');
+    const [tagsFilterInput, setTagsFilterInput] = useState('');
     const [showAddMenu, setShowAddMenu] = useState(false);
     const navigate = useNavigate();
 
@@ -601,10 +636,27 @@ const ContactsList: React.FC = () => {
         })();
     }, []);
 
-    const filtered = contacts.filter(c => 
-        c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        c.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const availableSegments = Array.from(
+        new Set(contacts.map(c => c.segment).filter((segment): segment is string => Boolean(segment)))
+    ).sort((a, b) => a.localeCompare(b));
+    const tagFilters = tagsFilterInput
+        .split(',')
+        .map(tag => tag.trim().toLowerCase())
+        .filter(tag => tag.length > 0);
+
+    const filtered = contacts.filter(c => {
+        const matchesSearch =
+            c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.email?.toLowerCase().includes(searchTerm.toLowerCase());
+        if (!matchesSearch) return false;
+        if (segmentFilter && (c.segment || '').toLowerCase() !== segmentFilter.toLowerCase()) return false;
+        if (tagFilters.length > 0) {
+            const contactTags = (c.tags || []).map(tag => tag.toLowerCase());
+            const hasMatchingTag = tagFilters.some(tag => contactTags.includes(tag));
+            if (!hasMatchingTag) return false;
+        }
+        return true;
+    });
 
     return (
         <div className="max-w-2xl mx-auto p-4 pb-24">
@@ -651,6 +703,31 @@ const ContactsList: React.FC = () => {
                 <button onClick={() => setShowAddMenu(true)} className="text-pink-500 text-[10px] font-black uppercase tracking-widest border border-pink-500/30 px-4 py-2 rounded-full hover:bg-pink-500/10 transition-colors">Record New</button>
             </div>
             <input type="text" placeholder="Search contacts..." className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full mb-6" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2">
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Segment</label>
+                    <select
+                        className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                        value={segmentFilter}
+                        onChange={e => setSegmentFilter(e.target.value)}
+                    >
+                        <option value="">All segments</option>
+                        {availableSegments.map(segment => (
+                            <option key={segment} value={segment}>{segment}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags</label>
+                    <input
+                        type="text"
+                        placeholder="Filter by tag (comma separated)"
+                        className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                        value={tagsFilterInput}
+                        onChange={e => setTagsFilterInput(e.target.value)}
+                    />
+                </div>
+            </div>
             <div className="bg-slate-800/40 border border-white/5 rounded-[2.5rem] overflow-hidden shadow-xl">
                 {filtered.length === 0 ? (
                     <div className="p-12 text-center">

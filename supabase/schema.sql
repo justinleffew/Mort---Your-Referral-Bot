@@ -9,6 +9,8 @@ create table if not exists contacts (
   location_context text,
   sale_date date,
   last_contacted_at timestamptz,
+  segment text,
+  tags text[] default '{}',
   comfort_level text,
   archived boolean default false,
   created_at timestamptz default now(),
