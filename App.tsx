@@ -602,50 +602,58 @@ const EditContact: React.FC = () => {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests</label>
-                    <input 
-                        type="text" 
-                        value={interestsInput} 
-                        onChange={e => setInterestsInput(e.target.value)} 
-                        onKeyDown={event => {
-                            if (event.key === 'Enter') {
-                                event.preventDefault();
-                                handleAddInterest(interestsInput);
-                            }
-                        }}
-                        onBlur={() => handleAddInterest(interestsInput)}
-                        className={InputStyle} 
-                        placeholder="Type an interest and press Enter"
-                        autoComplete="off"
-                    />
-                    {interests.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {interests.map(interest => (
-                                <span key={interest} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/60 text-[11px] font-bold uppercase tracking-widest text-slate-200">
-                                    {interest}
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveInterest(interest)}
-                                        className="text-slate-400 hover:text-white transition-colors"
-                                        aria-label={`Remove ${interest}`}
-                                    >
-                                        ×
-                                    </button>
-                                </span>
-                            ))}
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests + Tags</label>
+                    <div className="rounded-2xl border border-slate-700 bg-slate-900/40 p-4 space-y-4">
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests</label>
+                            <input
+                                type="text"
+                                value={interestsInput}
+                                onChange={e => setInterestsInput(e.target.value)}
+                                onKeyDown={event => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        handleAddInterest(interestsInput);
+                                    }
+                                }}
+                                onBlur={() => handleAddInterest(interestsInput)}
+                                className={InputStyle}
+                                placeholder="Type an interest and press Enter"
+                                autoComplete="off"
+                                spellCheck
+                                autoCorrect="on"
+                            />
+                            <p className="text-[11px] text-slate-500 mt-2">Spell check is enabled for interest entries.</p>
                         </div>
-                    )}
-                </div>
-                <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma separated)</label>
-                    <input
-                        type="text"
-                        value={tagsInput}
-                        onChange={e => setTagsInput(e.target.value)}
-                        className={InputStyle}
-                        placeholder="Investor, Repeat Client"
-                        autoComplete="off"
-                    />
+                        {interests.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {interests.map(interest => (
+                                    <span key={interest} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/60 text-[11px] font-bold uppercase tracking-widest text-slate-200">
+                                        {interest}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveInterest(interest)}
+                                            className="text-slate-400 hover:text-white transition-colors"
+                                            aria-label={`Remove ${interest}`}
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma separated)</label>
+                            <textarea
+                                value={tagsInput}
+                                onChange={e => setTagsInput(e.target.value)}
+                                className={`${InputStyle} min-h-[96px] resize-none`}
+                                placeholder="Investor, Repeat Client"
+                                autoComplete="off"
+                                rows={3}
+                            />
+                        </div>
+                    </div>
                 </div>
                 <button 
                     onClick={handleSave}
