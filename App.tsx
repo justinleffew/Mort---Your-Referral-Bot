@@ -606,8 +606,7 @@ const EditContact: React.FC = () => {
                     <div className="rounded-2xl border border-slate-700 bg-slate-900/40 p-4 space-y-4">
                         <div>
                             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests</label>
-                            <input
-                                type="text"
+                            <textarea
                                 value={interestsInput}
                                 onChange={e => setInterestsInput(e.target.value)}
                                 onKeyDown={event => {
@@ -617,11 +616,13 @@ const EditContact: React.FC = () => {
                                     }
                                 }}
                                 onBlur={() => handleAddInterest(interestsInput)}
-                                className={InputStyle}
+                                className={`${InputStyle} min-h-[56px] resize-none`}
                                 placeholder="Type an interest and press Enter"
                                 autoComplete="off"
-                                spellCheck
+                                spellCheck={true}
                                 autoCorrect="on"
+                                autoCapitalize="sentences"
+                                rows={1}
                             />
                             <p className="text-[11px] text-slate-500 mt-2">Spell check is enabled for interest entries.</p>
                         </div>
