@@ -467,9 +467,12 @@ const EditContact: React.FC = () => {
     });
     
     // Separate local string state to prevent cursor jumping issues during input
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [interestsInput, setInterestsInput] = useState('');
+    const [interests, setInterests] = useState<string[]>([]);
     const [tagsInput, setTagsInput] = useState('');
-    const segmentOptions = ['', 'Hot', 'Warm', 'Cold', 'Past Client', 'Referral'];
+    const segmentOptions = ['', 'past client', 'friend', 'referral champ', 'other'];
     const isEditing = Boolean(id);
 
     useEffect(() => {
@@ -478,28 +481,46 @@ const EditContact: React.FC = () => {
             const data = await dataService.getContactById(id);
             if (data) {
                 setContact(data);
-                setInterestsInput(data.radar_interests.join(', '));
+                const nameParts = data.full_name?.trim().split(/\s+/) ?? [];
+                setFirstName(nameParts[0] ?? '');
+                setLastName(nameParts.slice(1).join(' '));
+                setInterests(data.radar_interests);
+                setInterestsInput('');
                 setTagsInput((data.tags || []).join(', '));
             }
         })();
     }, [id]);
 
+    const handleAddInterest = (value: string) => {
+        const trimmed = value.trim();
+        if (!trimmed) return;
+        if (interests.some(interest => interest.toLowerCase() === trimmed.toLowerCase())) {
+            setInterestsInput('');
+            return;
+        }
+        setInterests(current => [...current, trimmed]);
+        setInterestsInput('');
+    };
+
+    const handleRemoveInterest = (value: string) => {
+        setInterests(current => current.filter(interest => interest !== value));
+    };
+
     const handleSave = async () => {
-        if (!contact.full_name?.trim()) {
+        const finalName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+        if (!finalName) {
             alert("Name is required");
             return;
         }
         
-        const finalInterests = interestsInput.split(',')
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
         const finalTags = tagsInput.split(',')
             .map(s => s.trim())
             .filter(s => s.length > 0);
 
         const finalContact = {
             ...contact,
-            radar_interests: finalInterests,
+            full_name: finalName,
+            radar_interests: interests,
             tags: finalTags
         };
         
@@ -524,13 +545,24 @@ const EditContact: React.FC = () => {
 
             <div className="bg-slate-800/40 border border-white/5 rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Full Name</label>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">First Name</label>
                     <input 
                         type="text" 
-                        value={contact.full_name || ''} 
-                        onChange={e => setContact({...contact, full_name: e.target.value})} 
+                        value={firstName} 
+                        onChange={e => setFirstName(e.target.value)} 
                         className={InputStyle} 
-                        placeholder="John Doe"
+                        placeholder="John"
+                        autoComplete="off"
+                    />
+                </div>
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Last Name</label>
+                    <input 
+                        type="text" 
+                        value={lastName} 
+                        onChange={e => setLastName(e.target.value)} 
+                        className={InputStyle} 
+                        placeholder="Doe"
                         autoComplete="off"
                     />
                 </div>
@@ -570,15 +602,39 @@ const EditContact: React.FC = () => {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests (comma separated)</label>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests</label>
                     <input 
                         type="text" 
                         value={interestsInput} 
                         onChange={e => setInterestsInput(e.target.value)} 
+                        onKeyDown={event => {
+                            if (event.key === 'Enter') {
+                                event.preventDefault();
+                                handleAddInterest(interestsInput);
+                            }
+                        }}
+                        onBlur={() => handleAddInterest(interestsInput)}
                         className={InputStyle} 
-                        placeholder="Golf, Hiking, Pizza"
+                        placeholder="Type an interest and press Enter"
                         autoComplete="off"
                     />
+                    {interests.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {interests.map(interest => (
+                                <span key={interest} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/60 text-[11px] font-bold uppercase tracking-widest text-slate-200">
+                                    {interest}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveInterest(interest)}
+                                        className="text-slate-400 hover:text-white transition-colors"
+                                        aria-label={`Remove ${interest}`}
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma separated)</label>
