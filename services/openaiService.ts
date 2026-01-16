@@ -9,15 +9,11 @@ const OPENAI_MODEL = 'gpt-4o-mini';
 const getEnvApiKey = () => {
     return import.meta.env.VITE_OPENAI_SECRET_KEY
         ?? process.env.OPENAI_SECRET_KEY
-        ?? process.env.VITE_OPENAI_SECRET_KEY
-        ?? process.env.API_KEY;
+        ?? process.env.VITE_OPENAI_SECRET_KEY;
 };
 
 export const getAi = (): OpenAiConfig | null => {
-    const localStorageKey = typeof localStorage !== 'undefined'
-        ? localStorage.getItem('OPENAI_SECRET_KEY')
-        : null;
-    const apiKey = localStorageKey || getEnvApiKey();
+    const apiKey = getEnvApiKey();
     if (!apiKey) return null;
     return { apiKey };
 };

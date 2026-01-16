@@ -887,17 +887,8 @@ const ContactsList: React.FC = () => {
 };
 
 const Settings: React.FC = () => {
-    const storedApiKey = localStorage.getItem('OPENAI_SECRET_KEY') || '';
-    const [apiKey, setApiKey] = useState(storedApiKey);
-    const [rememberApiKey, setRememberApiKey] = useState(Boolean(storedApiKey));
     const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
     const navigate = useNavigate();
-
-    useEffect(() => {
-        if (!rememberApiKey) {
-            localStorage.removeItem('OPENAI_SECRET_KEY');
-        }
-    }, [rememberApiKey]);
 
     useEffect(() => {
         void (async () => {
@@ -907,11 +898,6 @@ const Settings: React.FC = () => {
     }, []);
     
     const save = async () => {
-        if (rememberApiKey) {
-            localStorage.setItem('OPENAI_SECRET_KEY', apiKey);
-        } else {
-            localStorage.removeItem('OPENAI_SECRET_KEY');
-        }
         await dataService.saveProfile(profile);
         alert('Settings Saved');
     };
@@ -1010,22 +996,11 @@ const Settings: React.FC = () => {
                       </div>
                    )}
                 </section>
-                <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
+                <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-4">
                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">AI Engine</h2>
                    <p className="text-xs text-slate-400 leading-relaxed">
-                        Your API key can be saved in localStorage for quick access, but it is stored in plain text on this browser.
-                        Avoid enabling it on shared or public devices.
+                        AI requests are handled through the app account. There is no user-facing API key to manage.
                    </p>
-                   <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 text-white text-sm" placeholder="OpenAI API Key" />
-                   <label className="flex items-center justify-between gap-4 rounded-2xl border border-white/5 bg-slate-900/50 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-400">
-                        <span>Remember API key on this device</span>
-                        <input
-                            type="checkbox"
-                            checked={rememberApiKey}
-                            onChange={(event) => setRememberApiKey(event.target.checked)}
-                            className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-indigo-500 focus:ring-indigo-500"
-                        />
-                   </label>
                    <button onClick={save} className="w-full bg-indigo-600 text-white font-black uppercase text-xs py-4 rounded-xl">Save Preferences</button>
                 </section>
                 <button onClick={handleReset} className="w-full text-red-500 font-black uppercase text-[10px] tracking-widest pt-4">Delete All Data</button>
