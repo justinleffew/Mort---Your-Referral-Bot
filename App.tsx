@@ -1076,9 +1076,72 @@ const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
 };
 
+const NonRealtorHome: React.FC<{ personaLabel: string }> = ({ personaLabel }) => {
+    return (
+        <div className="max-w-2xl mx-auto px-6 pb-12">
+            <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mort For {personaLabel}</p>
+                    <h1 className="text-3xl font-black text-white uppercase tracking-tighter mt-3">Stay top of mind</h1>
+                    <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+                        Mort will help you keep warm relationships, remember follow-ups, and stay consistent with
+                        the people who matter most to your business.
+                    </p>
+                </div>
+                <div className="grid gap-4 text-xs font-bold text-slate-300">
+                    <div className="bg-slate-950/70 border border-white/5 rounded-2xl p-5">
+                        <p className="uppercase tracking-widest text-[10px] text-slate-500">Coming up</p>
+                        <p className="mt-3">Relationship check-ins, reminders, and smart prompts tailored to your world.</p>
+                    </div>
+                    <div className="bg-slate-950/70 border border-white/5 rounded-2xl p-5">
+                        <p className="uppercase tracking-widest text-[10px] text-slate-500">Next steps</p>
+                        <p className="mt-3">Tell us what you sell, who you serve, and how often you want to reach out.</p>
+                    </div>
+                </div>
+                <div className="rounded-2xl border border-dashed border-slate-700 p-5 text-xs text-slate-400">
+                    <p className="font-bold uppercase tracking-widest text-[10px] text-slate-500">We’re building fast</p>
+                    <p className="mt-2">Thanks for being an early adopter — new tools are on the way.</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => void }> = ({ children, onSignOut }) => {
+    return (
+        <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col">
+            <header className="px-8 py-6 flex items-center justify-between max-w-2xl mx-auto w-full">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
+                    <span className="text-2xl font-black text-white italic tracking-tighter">MORT</span>
+                </div>
+                <button
+                    onClick={onSignOut}
+                    className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                >
+                    Sign Out
+                </button>
+            </header>
+            <main className="relative flex-1">
+                <div className="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+                <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-cyan-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+                {children}
+            </main>
+        </div>
+    );
+};
+
+const personaLabelMap: Record<string, string> = {
+    realtor: 'Realtors',
+    business_owner: 'Business Owners',
+    executive: 'Executives',
+    connector: 'Connectors',
+};
+
 export default function App() {
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
+  const [persona, setPersona] = useState('realtor');
 
   useEffect(() => {
     if (!supabase) return;
@@ -1116,6 +1179,21 @@ export default function App() {
     };
   }, [supabase]);
 
+  useEffect(() => {
+    const metadataPersona = session?.user?.user_metadata?.mort_persona;
+    if (typeof metadataPersona === 'string' && metadataPersona.trim()) {
+      setPersona(metadataPersona);
+      localStorage.setItem('mort_persona', metadataPersona);
+      return;
+    }
+    const storedPersona = localStorage.getItem('mort_persona');
+    if (storedPersona) {
+      setPersona(storedPersona);
+    } else {
+      setPersona('realtor');
+    }
+  }, [session]);
+
   const handleSignOut = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -1124,27 +1202,38 @@ export default function App() {
   return (
     <HashRouter>
       {session ? (
-        <Layout>
-          <div className="max-w-2xl mx-auto px-6 pb-6 flex justify-end">
-            <button
-              onClick={handleSignOut}
-              className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
-            >
-              Sign Out
-            </button>
-          </div>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
-            <Route path="/commute" element={<CommuteMode />} />
-            <Route path="/contacts" element={<ContactsList />} />
-            <Route path="/contacts/add" element={<EditContact />} />
-            <Route path="/contacts/edit/:id" element={<EditContact />} />
-            <Route path="/contacts/:id" element={<ContactDetail />} />
-            <Route path="/tools" element={<Calculator />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </Layout>
+        persona === 'realtor' ? (
+            <Layout>
+                <div className="max-w-2xl mx-auto px-6 pb-6 flex justify-end">
+                    <button
+                        onClick={handleSignOut}
+                        className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                    >
+                        Sign Out
+                    </button>
+                </div>
+                <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
+                    <Route path="/commute" element={<CommuteMode />} />
+                    <Route path="/contacts" element={<ContactsList />} />
+                    <Route path="/contacts/add" element={<EditContact />} />
+                    <Route path="/contacts/edit/:id" element={<EditContact />} />
+                    <Route path="/contacts/:id" element={<ContactDetail />} />
+                    <Route path="/tools" element={<Calculator />} />
+                    <Route path="/settings" element={<Settings />} />
+                </Routes>
+            </Layout>
+        ) : (
+            <NonRealtorLayout onSignOut={handleSignOut}>
+                <Routes>
+                    <Route
+                        path="*"
+                        element={<NonRealtorHome personaLabel={personaLabelMap[persona] ?? 'Leaders'} />}
+                    />
+                </Routes>
+            </NonRealtorLayout>
+        )
       ) : (
         <AuthLayout>
           <AuthPanel supabase={supabase} />
