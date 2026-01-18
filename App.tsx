@@ -1076,31 +1076,129 @@ const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
 };
 
-const NonRealtorHome: React.FC<{ personaLabel: string }> = ({ personaLabel }) => {
+const NonRealtorHome: React.FC<{ persona: string }> = ({ persona }) => {
+    const personaContentMap: Record<
+        string,
+        {
+            label: string;
+            headline: string;
+            intro: string;
+            cards: Array<{ title: string; body: string }>;
+            checklistTitle: string;
+            checklist: string[];
+        }
+    > = {
+        business_owner: {
+            label: 'Business Owners',
+            headline: 'Build your referral flywheel',
+            intro:
+                'Add the customers, vendors, and partners who drive repeat business. Mort will help you track who you trust, who refers you, and when to reach out.',
+            cards: [
+                {
+                    title: 'Add referral contacts',
+                    body: 'Capture your best clients, service partners, and power customers—anyone who can send warm intros or needs your services again.',
+                },
+                {
+                    title: 'Log the relationship context',
+                    body: 'Note what they buy from you, who they refer to, and the last project or milestone you shared together.',
+                },
+                {
+                    title: 'Set a follow-up rhythm',
+                    body: 'Schedule check-ins after jobs, anniversaries, or quarterly updates so referrals stay consistent.',
+                },
+            ],
+            checklistTitle: 'Referral contact checklist',
+            checklist: ['Company + role', 'How you met', 'Top referral triggers', 'Next touch date'],
+        },
+        executive: {
+            label: 'Executives',
+            headline: 'Keep your influence network warm',
+            intro:
+                'Track the board members, stakeholders, and strategic partners who move opportunities forward. Mort keeps high-stakes relationships on your radar.',
+            cards: [
+                {
+                    title: 'Add key stakeholders',
+                    body: 'List board members, investors, and cross-functional allies who can open doors or need your support.',
+                },
+                {
+                    title: 'Capture shared priorities',
+                    body: 'Log initiatives, executive goals, and personal touchpoints so outreach feels relevant and timely.',
+                },
+                {
+                    title: 'Plan executive touchpoints',
+                    body: 'Schedule quarterly updates, conference follow-ups, and milestone check-ins to stay visible.',
+                },
+            ],
+            checklistTitle: 'Executive contact checklist',
+            checklist: ['Organization + role', 'Strategic initiatives', 'Recent wins', 'Preferred cadence'],
+        },
+        connector: {
+            label: 'Connectors',
+            headline: 'Organize your introductions engine',
+            intro:
+                'Build a curated list of people you love to connect. Mort helps you remember who knows whom and the best time to make intros.',
+            cards: [
+                {
+                    title: 'Add referral-ready people',
+                    body: 'Include community leaders, event hosts, and trusted friends who are always sharing opportunities.',
+                },
+                {
+                    title: 'Track who helps who',
+                    body: 'Note the industries they serve, who they want to meet, and recent intros you facilitated.',
+                },
+                {
+                    title: 'Keep the loop warm',
+                    body: 'Follow up after every introduction and schedule light check-ins so your network stays active.',
+                },
+            ],
+            checklistTitle: 'Connector checklist',
+            checklist: ['Industry focus', 'Who they want to meet', 'Last intro made', 'Follow-up reminder'],
+        },
+    };
+
+    const content = personaContentMap[persona] ?? {
+        label: 'Leaders',
+        headline: 'Stay top of mind',
+        intro:
+            'Mort will help you keep warm relationships, remember follow-ups, and stay consistent with the people who matter most to your business.',
+        cards: [
+            {
+                title: 'Add referral contacts',
+                body: 'Capture the people you want to nurture and keep close.',
+            },
+        ],
+        checklistTitle: 'Quick checklist',
+        checklist: ['Name + role', 'Why they matter', 'Next touch date'],
+    };
+
     return (
         <div className="max-w-2xl mx-auto px-6 pb-12">
             <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mort For {personaLabel}</p>
-                    <h1 className="text-3xl font-black text-white uppercase tracking-tighter mt-3">Stay top of mind</h1>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mort For {content.label}</p>
+                    <h1 className="text-3xl font-black text-white uppercase tracking-tighter mt-3">{content.headline}</h1>
                     <p className="text-sm text-slate-400 mt-3 leading-relaxed">
-                        Mort will help you keep warm relationships, remember follow-ups, and stay consistent with
-                        the people who matter most to your business.
+                        {content.intro}
                     </p>
                 </div>
                 <div className="grid gap-4 text-xs font-bold text-slate-300">
-                    <div className="bg-slate-950/70 border border-white/5 rounded-2xl p-5">
-                        <p className="uppercase tracking-widest text-[10px] text-slate-500">Coming up</p>
-                        <p className="mt-3">Relationship check-ins, reminders, and smart prompts tailored to your world.</p>
-                    </div>
-                    <div className="bg-slate-950/70 border border-white/5 rounded-2xl p-5">
-                        <p className="uppercase tracking-widest text-[10px] text-slate-500">Next steps</p>
-                        <p className="mt-3">Tell us what you sell, who you serve, and how often you want to reach out.</p>
-                    </div>
+                    {content.cards.map(card => (
+                        <div key={card.title} className="bg-slate-950/70 border border-white/5 rounded-2xl p-5">
+                            <p className="uppercase tracking-widest text-[10px] text-slate-500">{card.title}</p>
+                            <p className="mt-3">{card.body}</p>
+                        </div>
+                    ))}
                 </div>
                 <div className="rounded-2xl border border-dashed border-slate-700 p-5 text-xs text-slate-400">
-                    <p className="font-bold uppercase tracking-widest text-[10px] text-slate-500">We’re building fast</p>
-                    <p className="mt-2">Thanks for being an early adopter — new tools are on the way.</p>
+                    <p className="font-bold uppercase tracking-widest text-[10px] text-slate-500">{content.checklistTitle}</p>
+                    <ul className="mt-3 space-y-2">
+                        {content.checklist.map(item => (
+                            <li key={item} className="flex items-center gap-2">
+                                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-pink-500"></span>
+                                <span>{item}</span>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </div>
         </div>
@@ -1129,32 +1227,6 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
             </main>
         </div>
     );
-};
-
-const personaLabelMap: Record<string, string> = {
-    realtor: 'Realtors',
-    business_owner: 'Business Owners',
-    executive: 'Executives',
-    connector: 'Connectors',
-};
-
-const AuthCallback: React.FC = () => {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    localStorage.setItem('mort_auth_message', 'Thank you for creating an account. Log in.');
-    navigate('/', { replace: true });
-  }, [navigate]);
-
-  return (
-    <div className="max-w-md mx-auto p-6">
-      <div className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl text-center space-y-3">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Confirming</p>
-        <h2 className="text-xl font-black text-white uppercase tracking-tighter">Finishing up...</h2>
-        <p className="text-xs text-slate-400">We’re redirecting you back to Mort.</p>
-      </div>
-    </div>
-  );
 };
 
 export default function App() {
@@ -1248,7 +1320,7 @@ export default function App() {
                 <Routes>
                     <Route
                         path="*"
-                        element={<NonRealtorHome personaLabel={personaLabelMap[persona] ?? 'Leaders'} />}
+                        element={<NonRealtorHome persona={persona} />}
                     />
                 </Routes>
             </NonRealtorLayout>
