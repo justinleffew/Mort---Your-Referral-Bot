@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface AuthPanelProps {
@@ -13,6 +13,14 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const storedMessage = localStorage.getItem('mort_auth_message');
+    if (storedMessage) {
+      setMessage(storedMessage);
+      localStorage.removeItem('mort_auth_message');
+    }
+  }, []);
 
   const handleSignUp = async () => {
     if (!supabase || isSubmitting) return;
@@ -33,7 +41,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
     if (signUpError) {
       setError(signUpError.message);
     } else if (data.user && !data.session) {
-      setMessage('Check your email to confirm your account before signing in.');
+      setMessage('Check your email to confirm your account. Open the link to finish signing up.');
     } else {
       setMessage('Sign up complete. You are now signed in.');
     }

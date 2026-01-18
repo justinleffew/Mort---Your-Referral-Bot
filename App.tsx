@@ -1327,7 +1327,10 @@ export default function App() {
         )
       ) : (
         <AuthLayout>
-          <AuthPanel supabase={supabase} />
+          <Routes>
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="*" element={<AuthPanel supabase={supabase} />} />
+          </Routes>
         </AuthLayout>
       )}
     </HashRouter>
