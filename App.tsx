@@ -1138,6 +1138,25 @@ const personaLabelMap: Record<string, string> = {
     connector: 'Connectors',
 };
 
+const AuthCallback: React.FC = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    localStorage.setItem('mort_auth_message', 'Thank you for creating an account. Log in.');
+    navigate('/', { replace: true });
+  }, [navigate]);
+
+  return (
+    <div className="max-w-md mx-auto p-6">
+      <div className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl text-center space-y-3">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Confirming</p>
+        <h2 className="text-xl font-black text-white uppercase tracking-tighter">Finishing up...</h2>
+        <p className="text-xs text-slate-400">We’re redirecting you back to Mort.</p>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
@@ -1236,7 +1255,10 @@ export default function App() {
         )
       ) : (
         <AuthLayout>
-          <AuthPanel supabase={supabase} />
+          <Routes>
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="*" element={<AuthPanel supabase={supabase} />} />
+          </Routes>
         </AuthLayout>
       )}
     </HashRouter>
