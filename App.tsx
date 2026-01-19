@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
     });
     setSelectedMessages(defaults);
     if (opportunities.length === 0) {
-      setRunNowError('No opportunities returned. Check your Supabase connection.');
+      setRunNowError('No opportunities yet. Add more contacts.');
     }
     setRunNowLoading(false);
   };
@@ -217,7 +217,7 @@ const Dashboard: React.FC = () => {
 
       <div className="flex justify-between items-center mb-6 px-2">
           <div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Due This Week</h1>
+            <h1 className="text-2xl font-black text-white uppercase tracking-tighter">This week&apos;s opportunities</h1>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cadence: {cadenceLabel}</p>
           </div>
           <div className="flex items-center gap-3">
