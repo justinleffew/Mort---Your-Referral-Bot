@@ -1,4 +1,4 @@
-import { BrainDumpClient, Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from '../types';
+import { BrainDumpClient, Contact, ContactNote, Opportunity, RadarState, RealtorProfile, Touch, TouchType } from '../types';
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
 
 const STORAGE_KEYS = {
@@ -159,6 +159,11 @@ const normalizeContact = (contact: Contact): Contact => ({
   family_details: contact.family_details ?? { children: [], pets: [] },
   segment: contact.segment ?? '',
   tags: contact.tags ?? [],
+  cadence_days: contact.cadence_days ?? 90,
+  cadence_mode: contact.cadence_mode ?? 'AUTO',
+  safe_mode: contact.safe_mode ?? false,
+  do_not_contact: contact.do_not_contact ?? false,
+  home_area_id: contact.home_area_id ?? null,
 });
 
 const defaultRadarState = (contactId: string, userId: string): RadarState => ({
@@ -294,6 +299,11 @@ export const dataService = {
       last_contacted_at: data.last_contacted_at,
       segment: data.segment || '',
       tags: data.tags || [],
+      cadence_days: data.cadence_days ?? 90,
+      cadence_mode: data.cadence_mode ?? 'AUTO',
+      safe_mode: data.safe_mode ?? false,
+      do_not_contact: data.do_not_contact ?? false,
+      home_area_id: data.home_area_id ?? null,
       comfort_level: data.comfort_level || 'maybe',
       archived: false,
       created_at: new Date().toISOString(),
@@ -676,6 +686,26 @@ export const dataService = {
         const bScore = (b.suggested_action ? 100 : 0) + b.radar_interests.length * 10 + bSegmentBoost;
         return bScore - aScore;
       });
+  },
+
+  runNowOpportunities: async (): Promise<Opportunity[]> => {
+    const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      const { data, error } = await supabase.functions.invoke('mort-run-now', {
+        body: {},
+      });
+      if (error) {
+        console.warn('Failed to run now', error);
+        return [];
+      }
+      if (data && Array.isArray(data.opportunities)) {
+        return data.opportunities as Opportunity[];
+      }
+      return Array.isArray(data) ? (data as Opportunity[]) : [];
+    }
+
+    return [];
   },
 
   bulkImport: async (rows: any[]) => {

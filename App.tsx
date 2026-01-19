@@ -8,7 +8,7 @@ import CommuteMode from './components/CommuteMode';
 import AuthPanel from './components/AuthPanel';
 import { dataService } from './services/dataService';
 import { getSupabaseClient } from './services/supabaseClient';
-import { Contact, ContactNote, RadarState, RealtorProfile, Touch, TouchType } from './types';
+import { Contact, ContactNote, Opportunity, RadarState, RealtorProfile, Touch, TouchType } from './types';
 
 const DEFAULT_CADENCE_DAYS = 90;
 const DEFAULT_PROFILE: RealtorProfile = {
@@ -46,6 +46,10 @@ const Dashboard: React.FC = () => {
   const [cadenceDays, setCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
   const [cadenceLabel, setCadenceLabel] = useState(getCadenceLabel(DEFAULT_PROFILE));
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [runNowOpportunities, setRunNowOpportunities] = useState<Opportunity[]>([]);
+  const [runNowLoading, setRunNowLoading] = useState(false);
+  const [runNowError, setRunNowError] = useState<string | null>(null);
+  const [selectedMessages, setSelectedMessages] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -126,6 +130,33 @@ const Dashboard: React.FC = () => {
     await refreshRadar();
   };
 
+  const handleRunNow = async () => {
+    setRunNowLoading(true);
+    setRunNowError(null);
+    const opportunities = await dataService.runNowOpportunities();
+    setRunNowOpportunities(opportunities);
+    const defaults: Record<string, string> = {};
+    opportunities.forEach(opportunity => {
+      if (opportunity.suggested_messages?.length) {
+        defaults[opportunity.id] = opportunity.suggested_messages[0];
+      }
+    });
+    setSelectedMessages(defaults);
+    if (opportunities.length === 0) {
+      setRunNowError('No opportunities returned. Check your Supabase connection.');
+    }
+    setRunNowLoading(false);
+  };
+
+  const handleCopyMessage = async (message: string) => {
+    if (!message) return;
+    await navigator.clipboard.writeText(message);
+  };
+
+  const handleMarkContacted = async (contactId: string) => {
+    await dataService.addTouch(contactId, 'reach_out', { channel: 'text', source: 'run_now' });
+  };
+
   return (
     <div className="max-w-2xl mx-auto p-4 pb-24">
       {/* Selection Modal */}
@@ -189,8 +220,106 @@ const Dashboard: React.FC = () => {
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Due This Week</h1>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cadence: {cadenceLabel}</p>
           </div>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{dueThisWeekCount} Due</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRunNow}
+              disabled={runNowLoading}
+              className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-indigo-500/40 text-indigo-300 hover:text-white hover:border-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {runNowLoading ? 'Running…' : 'Run Now'}
+            </button>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{dueThisWeekCount} Due</span>
+          </div>
       </div>
+
+      {runNowError && (
+        <div className="mx-2 mb-6 text-xs text-amber-300 font-bold uppercase tracking-widest">
+          {runNowError}
+        </div>
+      )}
+
+      {runNowOpportunities.length > 0 && (
+        <div className="space-y-4 mb-10">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-sm font-black text-white uppercase tracking-widest">Run Now Opportunities</h2>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              {runNowOpportunities.length} Returned
+            </span>
+          </div>
+          {runNowOpportunities.map(opportunity => {
+            const selectedMessage = selectedMessages[opportunity.id] || opportunity.suggested_messages?.[0] || '';
+            const daysSince =
+              typeof opportunity.days_since_last_touch === 'number'
+                ? opportunity.days_since_last_touch
+                : opportunity.last_touch_at
+                  ? Math.floor((Date.now() - new Date(opportunity.last_touch_at).getTime()) / (1000 * 60 * 60 * 24))
+                  : undefined;
+            const cadenceDaysValue = opportunity.cadence_days ?? cadenceDays;
+            return (
+              <div key={opportunity.id} className="bg-slate-900/50 border border-white/5 rounded-3xl p-5 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-white font-black text-lg">{opportunity.contact_full_name ?? 'Contact'}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Score {opportunity.score}</p>
+                  </div>
+                  <button
+                    onClick={() => handleMarkContacted(opportunity.contact_id)}
+                    className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                  >
+                    Mark as contacted
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {typeof daysSince === 'number' && (
+                    <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-slate-800 text-slate-300">
+                      Touched {daysSince} days ago
+                    </span>
+                  )}
+                  {opportunity.year_cap_exceeded && (
+                    <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Exceeds 4/year
+                    </span>
+                  )}
+                  {opportunity.cadence_violation && (
+                    <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      Inside cadence (set to {cadenceDaysValue} days)
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <select
+                    value={selectedMessage}
+                    onChange={event =>
+                      setSelectedMessages(prev => ({
+                        ...prev,
+                        [opportunity.id]: event.target.value,
+                      }))
+                    }
+                    className="w-full bg-slate-950 border border-white/10 rounded-2xl text-sm text-white p-3"
+                  >
+                    {opportunity.suggested_messages?.map((message, index) => (
+                      <option key={`${opportunity.id}-message-${index}`} value={message}>
+                        {message.length > 80 ? `${message.slice(0, 80)}...` : message}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleCopyMessage(selectedMessage)}
+                      className="flex-1 bg-indigo-500/90 text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-2xl"
+                    >
+                      Copy message
+                    </button>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                      {opportunity.suggested_messages?.length ?? 0} variants
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       
       {radarItems.length === 0 ? (
         <div className="text-center py-16 px-6">
@@ -242,6 +371,9 @@ const ContactDetail: React.FC = () => {
         quarterCount: 0,
         lastTouch: null
     });
+    const [profileCadenceDays, setProfileCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
+    const [cadenceSelection, setCadenceSelection] = useState<number>(DEFAULT_CADENCE_DAYS);
+    const [customCadence, setCustomCadence] = useState<string>('');
 
     useEffect(() => {
         if (!id) return;
@@ -251,6 +383,20 @@ const ContactDetail: React.FC = () => {
             await refreshActivity(id);
         })();
     }, [id]);
+
+    useEffect(() => {
+        void (async () => {
+            const profile = await dataService.getProfile();
+            const cadenceDaysValue = getCadenceDays(profile);
+            setProfileCadenceDays(cadenceDaysValue);
+        })();
+    }, []);
+
+    useEffect(() => {
+        if (!contact) return;
+        setCadenceSelection(contact.cadence_days ?? DEFAULT_CADENCE_DAYS);
+        setCustomCadence('');
+    }, [contact]);
 
     if (!contact) return null;
 
@@ -269,6 +415,18 @@ const ContactDetail: React.FC = () => {
     const logTouch = async (type: TouchType) => {
         await dataService.addTouch(contact.id, type, { source: 'manual' });
         await refreshActivity(contact.id);
+    };
+
+    const handleCadenceUpdate = async (nextDays: number, mode: 'AUTO' | 'MANUAL') => {
+        const sanitizedDays = Math.max(1, Math.round(nextDays));
+        await dataService.updateContact(contact.id, { cadence_days: sanitizedDays, cadence_mode: mode });
+        setContact(prev => (prev ? { ...prev, cadence_days: sanitizedDays, cadence_mode: mode } : prev));
+        setCadenceSelection(sanitizedDays);
+    };
+
+    const toggleContactFlag = async (field: 'safe_mode' | 'do_not_contact', value: boolean) => {
+        await dataService.updateContact(contact.id, { [field]: value } as Partial<Contact>);
+        setContact(prev => (prev ? { ...prev, [field]: value } : prev));
     };
 
     const refreshActivity = async (contactId: string) => {
@@ -394,6 +552,73 @@ const ContactDetail: React.FC = () => {
                         <button onClick={() => logTouch('email')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-white/5">
                             Emailed
                         </button>
+                    </div>
+                </div>
+                <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cadence Settings</p>
+                        <button
+                            onClick={() => handleCadenceUpdate(profileCadenceDays, 'AUTO')}
+                            className="text-[10px] font-black uppercase tracking-widest text-indigo-300 border border-indigo-400/30 px-3 py-1 rounded-full"
+                        >
+                            Use profile cadence
+                        </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {[30, 60, 90, 120, 180].map(option => (
+                            <button
+                                key={`cadence-${option}`}
+                                onClick={() => handleCadenceUpdate(option, 'MANUAL')}
+                                className={`px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                    cadenceSelection === option
+                                        ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40'
+                                        : 'bg-slate-900 text-slate-400 border-white/5'
+                                }`}
+                            >
+                                {option} days
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="number"
+                            min={1}
+                            value={customCadence}
+                            onChange={event => setCustomCadence(event.target.value)}
+                            placeholder="Custom days"
+                            className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                        <button
+                            onClick={() => {
+                                const parsed = Number(customCadence);
+                                if (!Number.isNaN(parsed) && parsed > 0) {
+                                    void handleCadenceUpdate(parsed, 'MANUAL');
+                                }
+                            }}
+                            className="px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-200 text-[10px] font-black uppercase tracking-widest border border-indigo-500/40"
+                        >
+                            Set
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <label className="flex items-center justify-between gap-3 bg-slate-900/60 border border-white/5 rounded-2xl px-4 py-3 text-xs text-slate-300">
+                            Safe mode
+                            <input
+                                type="checkbox"
+                                checked={contact.safe_mode ?? false}
+                                onChange={event => toggleContactFlag('safe_mode', event.target.checked)}
+                                className="h-4 w-4 accent-indigo-500"
+                            />
+                        </label>
+                        <label className="flex items-center justify-between gap-3 bg-slate-900/60 border border-white/5 rounded-2xl px-4 py-3 text-xs text-slate-300">
+                            Do not contact
+                            <input
+                                type="checkbox"
+                                checked={contact.do_not_contact ?? false}
+                                onChange={event => toggleContactFlag('do_not_contact', event.target.checked)}
+                                className="h-4 w-4 accent-rose-500"
+                            />
+                        </label>
                     </div>
                 </div>
                 <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
@@ -1225,6 +1450,20 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
                 <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-cyan-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
                 {children}
             </main>
+        </div>
+    );
+};
+
+const AuthCallback: React.FC = () => {
+    return (
+        <div className="max-w-md mx-auto px-6 py-16 text-center">
+            <div className="w-14 h-14 mx-auto mb-6 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16m-6-6l6 6-6 6" />
+                </svg>
+            </div>
+            <h2 className="text-xl font-black text-white uppercase tracking-widest">Completing sign in</h2>
+            <p className="text-xs text-slate-400 mt-3">Hang tight while we connect your session.</p>
         </div>
     );
 };
