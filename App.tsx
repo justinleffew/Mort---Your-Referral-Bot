@@ -892,11 +892,20 @@ const EditContact: React.FC = () => {
     );
 };
 
+const getEstimatedInsurance = (price: number) => {
+  if (price <= 300000) return 100;
+  if (price <= 500000) return 100 + (price - 300000) * 0.000125;
+  return 125 + (price - 500000) * 0.0001;
+};
+
 const Calculator: React.FC = () => {
   const [price, setPrice] = useState<number>(500000);
   const [down, setDown] = useState<number>(20);
   const [rate, setRate] = useState<number>(6.5);
   const [taxes, setTaxes] = useState<number>(6000);
+  const [insurance, setInsurance] = useState<number>(() => getEstimatedInsurance(500000));
+  const [insuranceEdited, setInsuranceEdited] = useState(false);
+  const [pmiRate, setPmiRate] = useState<number>(0.5);
   const [showMode, setShowMode] = useState(false);
   const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
 
@@ -907,19 +916,21 @@ const Calculator: React.FC = () => {
     })();
   }, []);
   
-  const getEstimatedInsurance = (p: number) => {
-    if (p <= 300000) return 100;
-    if (p <= 500000) return 100 + (p - 300000) * 0.000125; 
-    return 125 + (p - 500000) * 0.0001; 
-  };
+  useEffect(() => {
+    if (!insuranceEdited) {
+      setInsurance(getEstimatedInsurance(price));
+    }
+  }, [insuranceEdited, price]);
 
-  const monthlyInsurance = getEstimatedInsurance(price);
+  const monthlyInsurance = insurance;
   const monthlyTaxes = taxes / 12;
   const loanAmount = price * (1 - down / 100);
   const monthlyRate = rate / 100 / 12;
   const numPayments = 30 * 12;
   const monthlyPI = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
-  const totalMonthly = monthlyPI + monthlyTaxes + monthlyInsurance;
+  const isPmiRequired = down < 20;
+  const monthlyPmi = isPmiRequired ? (loanAmount * (pmiRate / 100)) / 12 : 0;
+  const totalMonthly = monthlyPI + monthlyTaxes + monthlyInsurance + monthlyPmi;
 
   const InputStyle = "w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-white font-bold outline-none transition-all focus:ring-2 focus:ring-pink-500";
   
@@ -935,6 +946,7 @@ const Calculator: React.FC = () => {
               <span>P&I: ${Math.round(monthlyPI)}</span>
               <span>Taxes: ${Math.round(monthlyTaxes)}</span>
               <span>Ins: ${Math.round(monthlyInsurance)}</span>
+              {isPmiRequired && <span>PMI: ${Math.round(monthlyPmi)}</span>}
             </div>
           </div>
           <div className="bg-slate-900 border border-white/5 p-10 rounded-[3rem] space-y-8 shadow-2xl">
@@ -968,6 +980,37 @@ const Calculator: React.FC = () => {
                 <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Down %</label><input type="number" value={down} onChange={e => setDown(Number(e.target.value))} className={InputStyle} /></div>
                 <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Rate</label><input type="number" step="0.1" value={rate} onChange={e => setRate(Number(e.target.value))} className={InputStyle} /></div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Taxes (annual)</label>
+                    <input type="number" value={taxes} onChange={e => setTaxes(Number(e.target.value))} className={InputStyle} />
+                </div>
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Insurance (monthly)</label>
+                    <input
+                        type="number"
+                        value={insurance}
+                        onChange={e => {
+                            setInsurance(Number(e.target.value));
+                            setInsuranceEdited(true);
+                        }}
+                        className={InputStyle}
+                    />
+                </div>
+            </div>
+            {isPmiRequired && (
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">PMI rate (annual %)</label>
+                    <input
+                        type="number"
+                        step="0.1"
+                        min={0}
+                        value={pmiRate}
+                        onChange={e => setPmiRate(Number(e.target.value))}
+                        className={InputStyle}
+                    />
+                </div>
+            )}
             <div className="pt-8 border-t border-white/5 mt-4 space-y-4">
                 <div className="flex justify-between items-center text-slate-400 font-bold px-1"><span>Total Monthly</span><span className="text-3xl font-black text-white">${Math.round(totalMonthly).toLocaleString()}</span></div>
                 <p className="text-[9px] text-slate-600 font-bold uppercase text-center tracking-widest">Estimates only. Not a quote.</p>
@@ -1120,9 +1163,20 @@ const ContactsList: React.FC = () => {
     );
 };
 
-const Settings: React.FC = () => {
+const personaOptions = [
+  { value: 'realtor', label: 'Realtor' },
+  { value: 'business_owner', label: 'Business Owner' },
+  { value: 'executive', label: 'Executive' },
+  { value: 'connector', label: 'Connector' },
+];
+
+const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: string) => void }> = ({
+    persona,
+    onPersonaChange,
+}) => {
     const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
-    const navigate = useNavigate();
+    const [personaSelection, setPersonaSelection] = useState(persona);
+    const supabase = getSupabaseClient();
 
     useEffect(() => {
         void (async () => {
@@ -1130,6 +1184,10 @@ const Settings: React.FC = () => {
             setProfile(savedProfile);
         })();
     }, []);
+
+    useEffect(() => {
+        setPersonaSelection(persona);
+    }, [persona]);
     
     const save = async () => {
         await dataService.saveProfile(profile);
@@ -1151,6 +1209,23 @@ const Settings: React.FC = () => {
           setProfile(prev => ({ ...prev, headshot: reader.result as string }));
         };
         reader.readAsDataURL(file);
+      }
+    };
+
+    const handlePersonaChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const nextPersona = event.target.value;
+      setPersonaSelection(nextPersona);
+      onPersonaChange(nextPersona);
+      localStorage.setItem('mort_persona', nextPersona);
+      if (supabase) {
+        const { error } = await supabase.auth.updateUser({
+          data: {
+            mort_persona: nextPersona,
+          },
+        });
+        if (error) {
+          console.warn('Failed to update persona', error);
+        }
       }
     };
 
@@ -1177,6 +1252,24 @@ const Settings: React.FC = () => {
         <div className="max-w-md mx-auto p-6 pb-24">
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-8">Preferences</h1>
             <div className="space-y-8">
+                <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-5">
+                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Persona</h2>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                        Switch how Mort is tailored. Your dashboard and prompts will adapt to the role you choose.
+                    </p>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Current role</label>
+                    <select
+                        value={personaSelection}
+                        onChange={handlePersonaChange}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm"
+                    >
+                        {personaOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                    </select>
+                </section>
                 <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
                     <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Co-Branding</h2>
                     <div className="flex items-center gap-6">
@@ -1467,12 +1560,20 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
                     <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
                     <span className="text-2xl font-black text-white italic tracking-tighter">MORT</span>
                 </div>
-                <button
-                    onClick={onSignOut}
-                    className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
-                >
-                    Sign Out
-                </button>
+                <div className="flex items-center gap-4">
+                    <Link
+                        to="/settings"
+                        className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                    >
+                        Preferences
+                    </Link>
+                    <button
+                        onClick={onSignOut}
+                        className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                    >
+                        Sign Out
+                    </button>
+                </div>
             </header>
             <main className="relative flex-1">
                 <div className="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
@@ -1580,12 +1681,13 @@ export default function App() {
                     <Route path="/contacts/edit/:id" element={<EditContact />} />
                     <Route path="/contacts/:id" element={<ContactDetail />} />
                     <Route path="/tools" element={<Calculator />} />
-                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/settings" element={<Settings persona={persona} onPersonaChange={setPersona} />} />
                 </Routes>
             </Layout>
         ) : (
             <NonRealtorLayout onSignOut={handleSignOut}>
                 <Routes>
+                    <Route path="/settings" element={<Settings persona={persona} onPersonaChange={setPersona} />} />
                     <Route
                         path="*"
                         element={<NonRealtorHome persona={persona} />}
