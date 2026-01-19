@@ -23,6 +23,11 @@ export interface Contact {
   last_contacted_at?: string; // ISO date string
   segment?: string;
   tags?: string[];
+  cadence_days?: number;
+  cadence_mode?: 'AUTO' | 'MANUAL';
+  safe_mode?: boolean;
+  do_not_contact?: boolean;
+  home_area_id?: string | null;
   comfort_level: ComfortLevel;
   archived: boolean;
   created_at: string;
@@ -56,7 +61,7 @@ export interface RadarState {
   last_refreshed_at?: string;
 }
 
-export type TouchType = 'call' | 'text' | 'email' | 'meeting' | 'auto';
+export type TouchType = 'call' | 'text' | 'email' | 'meeting' | 'auto' | 'reach_out';
 
 export interface Touch {
   id: string;
@@ -81,6 +86,29 @@ export interface RealtorProfile {
   headshot?: string; // base64
   cadence_type?: 'weekly' | 'monthly' | 'quarterly' | 'custom';
   cadence_custom_days?: number;
+}
+
+export interface Opportunity {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  area_id?: string | null;
+  run_context: 'WEEKLY' | 'RUN_NOW';
+  score: number;
+  reasons: string[];
+  suggested_messages: string[];
+  chosen_message?: string | null;
+  status: 'new' | 'dismissed' | 'sent' | 'snoozed';
+  warning_flags: string[];
+  last_touch_at?: string | null;
+  touches_last_365: number;
+  cadence_violation: boolean;
+  year_cap_exceeded: boolean;
+  created_at: string;
+  updated_at: string;
+  contact_full_name?: string;
+  cadence_days?: number;
+  days_since_last_touch?: number;
 }
 
 export type RadarAngle = 'friendly_checkin' | 'interest_based' | 'time_since_contact' | 'homeownership_milestone' | 'light_value_framing' | 'equity_opportunity';
