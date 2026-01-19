@@ -13,6 +13,24 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const configuredRedirect = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim();
+
+  const getEmailRedirectTo = () => {
+    if (!configuredRedirect) {
+      return `${window.location.origin}/#/auth/callback`;
+    }
+
+    try {
+      const redirectUrl = new URL(configuredRedirect);
+      if (redirectUrl.hash || redirectUrl.pathname !== '/') {
+        return configuredRedirect;
+      }
+      redirectUrl.hash = '#/auth/callback';
+      return redirectUrl.toString();
+    } catch {
+      return `${configuredRedirect.replace(/\/+$/, '')}/#/auth/callback`;
+    }
+  };
 
   useEffect(() => {
     const storedMessage = localStorage.getItem('mort_auth_message');
@@ -27,7 +45,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
     setIsSubmitting(true);
     setError(null);
     setMessage(null);
-    const emailRedirectTo = `${window.location.origin}/#/auth/callback`;
+    const emailRedirectTo = getEmailRedirectTo();
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
