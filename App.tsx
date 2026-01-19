@@ -1302,6 +1302,22 @@ const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const NonRealtorHome: React.FC<{ persona: string }> = ({ persona }) => {
+    const [contacts, setContacts] = useState<Contact[]>([]);
+    const [contactsLoading, setContactsLoading] = useState(true);
+
+    useEffect(() => {
+        let isMounted = true;
+        void (async () => {
+            const data = await dataService.getContacts();
+            if (isMounted) {
+                setContacts(data);
+                setContactsLoading(false);
+            }
+        })();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
     const personaContentMap: Record<
         string,
         {
@@ -1424,6 +1440,19 @@ const NonRealtorHome: React.FC<{ persona: string }> = ({ persona }) => {
                             </li>
                         ))}
                     </ul>
+                </div>
+                <div className="space-y-4">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mort Assist</p>
+                        <p className="text-xs text-slate-400 mt-2">
+                            Ask Mort for ideas, follow-ups, or notes about the contacts you have uploaded.
+                        </p>
+                    </div>
+                    {contactsLoading ? (
+                        <div className="text-xs text-slate-400">Loading your contacts...</div>
+                    ) : (
+                        <MortgageAssist mode="general" contacts={contacts} personaLabel={content.label} />
+                    )}
                 </div>
             </div>
         </div>

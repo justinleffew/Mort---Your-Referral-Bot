@@ -81,6 +81,10 @@ export interface MortgageQueryResponse {
   next_steps: string;
 }
 
+export interface GeneralAssistResponse {
+  response: string;
+}
+
 export interface RealtorProfile {
   name: string;
   headshot?: string; // base64

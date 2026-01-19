@@ -1,4 +1,4 @@
-import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient } from "../types";
+import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient, GeneralAssistResponse } from "../types";
 
 type OpenAiConfig = {
     apiKey: string;
@@ -160,5 +160,46 @@ export const generateMortgageResponse = async (query: string): Promise<MortgageQ
         ballpark_numbers: json.ballpark_numbers || '',
         heads_up: json.heads_up || '',
         next_steps: json.next_steps || ''
+    };
+};
+
+const formatContactSummary = (contact: Contact) => {
+    const details = [
+        `Name: ${contact.full_name}`,
+        contact.location_context ? `Location: ${contact.location_context}` : null,
+        contact.segment ? `Segment: ${contact.segment}` : null,
+        contact.tags?.length ? `Tags: ${contact.tags.join(', ')}` : null,
+        contact.radar_interests.length ? `Interests: ${contact.radar_interests.join(', ')}` : null,
+        contact.family_details.children.length ? `Children: ${contact.family_details.children.join(', ')}` : null,
+        contact.family_details.pets.length ? `Pets: ${contact.family_details.pets.join(', ')}` : null,
+        contact.sale_date ? `Sale date: ${contact.sale_date}` : null,
+        contact.last_contacted_at ? `Last contacted: ${contact.last_contacted_at}` : null,
+    ].filter(Boolean);
+    return details.join(' | ');
+};
+
+export const generateGeneralAssistResponse = async (
+    query: string,
+    contacts: Contact[],
+    personaLabel?: string
+): Promise<GeneralAssistResponse> => {
+    const ai = getAi();
+    if (!ai) return { response: "AI Key missing." };
+
+    const contactSummaries = contacts.slice(0, 30).map(formatContactSummary).join('\n');
+    const prompt = `
+    You are Mort, a helpful assistant for relationship-based referral management. The user persona is "${personaLabel || 'general user'}".
+    Use the contact data to answer questions, generate outreach ideas, and surface follow-up opportunities.
+    If a question is ambiguous, ask one short clarifying question.
+
+    Contacts on file:\n${contactSummaries || 'No contacts available.'}
+
+    User question: "${query}"
+    Output JSON: { "response": "string" }
+    `;
+
+    const json = await callOpenAiJson<GeneralAssistResponse>(ai.apiKey, prompt);
+    return {
+        response: json.response || ''
     };
 };
