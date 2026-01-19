@@ -1454,6 +1454,20 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
     );
 };
 
+const AuthCallback: React.FC = () => {
+    return (
+        <div className="max-w-md mx-auto px-6 py-16 text-center">
+            <div className="w-14 h-14 mx-auto mb-6 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16m-6-6l6 6-6 6" />
+                </svg>
+            </div>
+            <h2 className="text-xl font-black text-white uppercase tracking-widest">Completing sign in</h2>
+            <p className="text-xs text-slate-400 mt-3">Hang tight while we connect your session.</p>
+        </div>
+    );
+};
+
 export default function App() {
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
