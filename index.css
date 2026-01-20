@@ -8,6 +8,11 @@ body {
   color: #f8fafc;
 }
 
+button:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
 /* Custom scrollbar for cleaner UI */
 ::-webkit-scrollbar {
   width: 6px;
