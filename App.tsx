@@ -1553,8 +1553,47 @@ const NonRealtorHome: React.FC<{ persona: string }> = ({ persona }) => {
 };
 
 const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => void }> = ({ children, onSignOut }) => {
+    const [showAddMenu, setShowAddMenu] = useState(false);
+    const navigate = useNavigate();
+
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col">
+            {showAddMenu && (
+                <div className="fixed inset-0 z-[110] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
+                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowAddMenu(false)}></div>
+                    <div className="relative bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 space-y-4 shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
+                        <div className="text-center mb-6">
+                            <h3 className="text-xl font-black text-white uppercase tracking-tighter">Add Contact</h3>
+                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Choose your entry mode</p>
+                        </div>
+                        <button
+                            onClick={() => { navigate('/commute'); setShowAddMenu(false); }}
+                            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 p-6 rounded-3xl flex items-center gap-4 group hover:scale-[1.02] transition-transform shadow-xl"
+                        >
+                            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white">
+                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                            </div>
+                            <div className="text-left">
+                                <p className="text-white font-black uppercase text-xs tracking-widest">Brain Dump</p>
+                                <p className="text-white/60 text-[10px] font-bold">Fast voice ingestion</p>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => { navigate('/contacts/add'); setShowAddMenu(false); }}
+                            className="w-full bg-slate-800 border border-white/5 p-6 rounded-3xl flex items-center gap-4 group hover:bg-slate-700 transition-colors shadow-lg"
+                        >
+                            <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </div>
+                            <div className="text-left">
+                                <p className="text-white font-black uppercase text-xs tracking-widest">Manual Entry</p>
+                                <p className="text-slate-500 text-[10px] font-bold">Text & details</p>
+                            </div>
+                        </button>
+                        <button onClick={() => setShowAddMenu(false)} className="w-full text-slate-600 font-black uppercase text-[10px] tracking-[0.2em] pt-4">Cancel</button>
+                    </div>
+                </div>
+            )}
             <header className="px-8 py-6 flex items-center justify-between max-w-2xl mx-auto w-full">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
@@ -1575,6 +1614,28 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
                     </button>
                 </div>
             </header>
+            <div className="px-8 pb-6 max-w-2xl mx-auto w-full">
+                <div className="bg-slate-900/40 border border-white/10 rounded-3xl px-4 py-3 flex flex-wrap items-center gap-3 shadow-lg">
+                    <button
+                        onClick={() => setShowAddMenu(true)}
+                        className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md hover:scale-[1.02] transition-transform"
+                    >
+                        Add Contact
+                    </button>
+                    <button
+                        onClick={() => navigate('/contacts')}
+                        className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 text-slate-200 hover:text-white hover:border-white/30 transition"
+                    >
+                        Contacts
+                    </button>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 text-slate-200 hover:text-white hover:border-white/30 transition"
+                    >
+                        Mort Assist
+                    </button>
+                </div>
+            </div>
             <main className="relative flex-1">
                 <div className="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
                 <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-cyan-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
@@ -1687,6 +1748,12 @@ export default function App() {
         ) : (
             <NonRealtorLayout onSignOut={handleSignOut}>
                 <Routes>
+                    <Route path="/" element={<NonRealtorHome persona={persona} />} />
+                    <Route path="/commute" element={<CommuteMode />} />
+                    <Route path="/contacts" element={<ContactsList />} />
+                    <Route path="/contacts/add" element={<EditContact />} />
+                    <Route path="/contacts/edit/:id" element={<EditContact />} />
+                    <Route path="/contacts/:id" element={<ContactDetail />} />
                     <Route path="/settings" element={<Settings persona={persona} onPersonaChange={setPersona} />} />
                     <Route
                         path="*"
