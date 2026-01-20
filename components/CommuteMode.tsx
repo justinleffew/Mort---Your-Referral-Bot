@@ -8,32 +8,51 @@ const CommuteMode: React.FC = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [speechSupported, setSpeechSupported] = useState(true);
+    const [speechError, setSpeechError] = useState('');
+    const [showManualEntry, setShowManualEntry] = useState(false);
     const recognitionRef = useRef<any>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = true;
-            recognitionRef.current.interimResults = true;
-            
-            recognitionRef.current.onresult = (event: any) => {
-                let current = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    current += event.results[i][0].transcript;
-                }
-                setTranscript(current);
-            };
+        if (!SpeechRecognition) {
+            setSpeechSupported(false);
+            setShowManualEntry(true);
+            return;
         }
+
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+
+        recognitionRef.current.onresult = (event: any) => {
+            let current = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                current += event.results[i][0].transcript;
+            }
+            setTranscript(current);
+        };
+
+        recognitionRef.current.onerror = (event: any) => {
+            setSpeechError(event?.error ? `Speech recognition error: ${event.error}.` : 'Speech recognition encountered an error.');
+        };
+
+        recognitionRef.current.onnomatch = () => {
+            setSpeechError('No speech could be recognized. Try again or use manual entry.');
+        };
     }, []);
 
     const toggleRecording = () => {
+        if (!speechSupported) {
+            return;
+        }
         if (isRecording) {
             recognitionRef.current?.stop();
             setIsRecording(false);
         } else {
             setTranscript('');
+            setSpeechError('');
             recognitionRef.current?.start();
             setIsRecording(true);
         }
@@ -70,7 +89,8 @@ const CommuteMode: React.FC = () => {
 
                 <button 
                     onClick={toggleRecording}
-                    className={`w-56 h-56 rounded-full flex items-center justify-center transition-all duration-700 relative ${isRecording ? 'bg-pink-500 shadow-[0_0_80px_rgba(236,72,153,0.6)]' : 'bg-slate-900 border-4 border-slate-800'}`}
+                    disabled={!speechSupported}
+                    className={`w-56 h-56 rounded-full flex items-center justify-center transition-all duration-700 relative ${isRecording ? 'bg-pink-500 shadow-[0_0_80px_rgba(236,72,153,0.6)]' : 'bg-slate-900 border-4 border-slate-800'} ${speechSupported ? '' : 'opacity-40 cursor-not-allowed'}`}
                 >
                     {isRecording && (
                         <>
@@ -84,11 +104,48 @@ const CommuteMode: React.FC = () => {
                     </svg>
                 </button>
 
+                {!speechSupported && (
+                    <div className="w-full max-w-md rounded-2xl border border-pink-500/40 bg-pink-500/10 px-5 py-4 text-center text-sm text-pink-100">
+                        Speech recognition isn’t supported in this browser. Use manual entry below to continue.
+                    </div>
+                )}
+
+                {speechError && (
+                    <div className="w-full max-w-md rounded-2xl border border-amber-400/40 bg-amber-400/10 px-5 py-4 text-center text-sm text-amber-100">
+                        {speechError}
+                    </div>
+                )}
+
                 <div className={`w-full max-w-md bg-slate-900/50 border border-white/5 rounded-[2rem] p-6 h-32 overflow-y-auto transition-opacity ${transcript ? 'opacity-100' : 'opacity-20'}`}>
                     <p className="text-slate-200 text-center font-medium leading-relaxed italic">
                         {transcript || "Speak clearly... I'm listening for names, dates, and interests."}
                     </p>
                 </div>
+
+                {!speechSupported && (
+                    <button
+                        type="button"
+                        onClick={() => setShowManualEntry(true)}
+                        className="text-xs font-bold uppercase tracking-[0.2em] text-pink-300 hover:text-pink-200"
+                    >
+                        Use Manual Entry
+                    </button>
+                )}
+
+                {showManualEntry && (
+                    <div className="w-full max-w-md">
+                        <label className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+                            Manual Entry
+                        </label>
+                        <textarea
+                            value={transcript}
+                            onChange={(event) => setTranscript(event.target.value)}
+                            rows={5}
+                            className="mt-3 w-full rounded-2xl border border-white/10 bg-slate-900/60 p-4 text-slate-100 focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-500/40"
+                            placeholder="Type the client details you would have spoken..."
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Action Bar */}
