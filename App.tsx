@@ -40,13 +40,127 @@ const getCadenceLabel = (profile?: RealtorProfile, cadenceDays?: number) => {
   return 'Quarterly';
 };
 
+const parseCsvRows = (content: string) => {
+  const rows = content
+    .split(/\r?\n/)
+    .map(row => row.trim())
+    .filter(Boolean);
+  if (rows.length === 0) return [];
+  const headers = rows[0].split(',').map(header => header.trim());
+  return rows.slice(1).map(row => {
+    const values = row.split(',').map(value => value.trim());
+    return headers.reduce<Record<string, string>>((acc, header, index) => {
+      acc[header] = values[index] ?? '';
+      return acc;
+    }, {});
+  });
+};
+
+const ImportContactsModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onImported?: () => void;
+}> = ({ isOpen, onClose, onImported }) => {
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ added: number; updated: number; skipped: number } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setImportResult(null);
+      setImportError(null);
+      setIsImporting(false);
+    }
+  }, [isOpen]);
+
+  const handleCsvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    setImportError(null);
+    setImportResult(null);
+    const text = await file.text();
+    const rows = parseCsvRows(text);
+    if (rows.length === 0) {
+      setImportError('No rows detected. Please upload a CSV with headers.');
+      setIsImporting(false);
+      event.target.value = '';
+      return;
+    }
+    const result = await dataService.bulkImport(rows);
+    setImportResult(result);
+    setIsImporting(false);
+    event.target.value = '';
+    onImported?.();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
+      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="relative bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
+        <div className="text-center space-y-2">
+          <h3 className="text-xl font-black text-white uppercase tracking-tighter">Import Contacts</h3>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">CSV or Google</p>
+        </div>
+        <label className="w-full bg-slate-800 border border-white/5 p-5 rounded-3xl flex items-center gap-4 cursor-pointer hover:bg-slate-700 transition-colors shadow-lg">
+          <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-300">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M8 12l4-4m0 0l4 4m-4-4v12"/></svg>
+          </div>
+          <div>
+            <p className="text-white font-black uppercase text-xs tracking-widest">Upload CSV</p>
+            <p className="text-slate-500 text-[10px] font-bold">Use Name, Email, Phone headers</p>
+          </div>
+          <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvUpload} />
+        </label>
+        <button
+          type="button"
+          disabled
+          className="w-full bg-slate-800/40 border border-white/5 p-5 rounded-3xl flex items-center gap-4 text-left opacity-60 cursor-not-allowed"
+        >
+          <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-300">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 3v18m9-9H3"/></svg>
+          </div>
+          <div>
+            <p className="text-white font-black uppercase text-xs tracking-widest">Connect Google</p>
+            <p className="text-slate-500 text-[10px] font-bold">Coming soon</p>
+          </div>
+        </button>
+        {isImporting && (
+          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">
+            Importing…
+          </div>
+        )}
+        {importError && (
+          <div className="text-[10px] font-bold uppercase tracking-widest text-rose-300 text-center">
+            {importError}
+          </div>
+        )}
+        {importResult && (
+          <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-300 text-center">
+            {importResult.added} added · {importResult.updated} updated · {importResult.skipped} skipped
+          </div>
+        )}
+        <button onClick={onClose} className="w-full text-slate-600 font-black uppercase text-[10px] tracking-[0.2em] pt-2">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const Dashboard: React.FC = () => {
   const [radarItems, setRadarItems] = useState<Array<{ contact: Contact; notes: ContactNote[]; state: RadarState }>>([]);
   const [stats, setStats] = useState({ total: 0, withInterests: 0, percent: 0 });
+  const [contactsCount, setContactsCount] = useState(0);
+  const [sampleSeeded, setSampleSeeded] = useState(dataService.hasSeededSampleContacts());
+  const [sampleSeeding, setSampleSeeding] = useState(false);
   const [dueThisWeekCount, setDueThisWeekCount] = useState(0);
   const [cadenceDays, setCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
   const [cadenceLabel, setCadenceLabel] = useState(getCadenceLabel(DEFAULT_PROFILE));
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showImportMenu, setShowImportMenu] = useState(false);
   const [runNowOpportunities, setRunNowOpportunities] = useState<Opportunity[]>([]);
   const [runNowLoading, setRunNowLoading] = useState(false);
   const [runNowError, setRunNowError] = useState<string | null>(null);
@@ -67,6 +181,8 @@ const Dashboard: React.FC = () => {
       dataService.getContacts(),
       dataService.getRadarStates(),
     ]);
+    setContactsCount(contacts.length);
+    setSampleSeeded(dataService.hasSeededSampleContacts());
     const limitedEligible = eligible.slice(0, 5);
     const items = await Promise.all(
       limitedEligible.map(async contact => {
@@ -157,6 +273,14 @@ const Dashboard: React.FC = () => {
     await dataService.addTouch(contactId, 'reach_out', { channel: 'sms', body: message, source: 'run_now' });
   };
 
+  const handleSeedSampleContacts = async () => {
+    setSampleSeeding(true);
+    await dataService.seedSampleContacts();
+    setSampleSeeding(false);
+    setSampleSeeded(dataService.hasSeededSampleContacts());
+    await refreshRadar();
+  };
+
   return (
     <div className="max-w-2xl mx-auto p-4 pb-24">
       {/* Selection Modal */}
@@ -197,6 +321,12 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
+      <ImportContactsModal
+        isOpen={showImportMenu}
+        onClose={() => setShowImportMenu(false)}
+        onImported={() => void refreshRadar()}
+      />
+
       <div className="bg-slate-900/40 border border-white/5 rounded-[2.5rem] p-6 mb-8 flex items-center justify-between shadow-2xl">
           <div className="flex-1">
             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-2">Radar Coverage</h4>
@@ -213,6 +343,15 @@ const Dashboard: React.FC = () => {
           >
             <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           </button>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-3 mb-6 px-2">
+        <button
+          onClick={() => setShowImportMenu(true)}
+          className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400 transition-colors"
+        >
+          Import contacts (CSV or Google)
+        </button>
       </div>
 
       <div className="flex justify-between items-center mb-6 px-2">
@@ -331,13 +470,44 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <h3 className="text-2xl font-black text-white mb-3">Radar Empty</h3>
-          <p className="text-slate-400 mb-10 max-w-xs mx-auto text-sm leading-relaxed font-medium">Start adding some clients so I can get to work for you!</p>
-          <button 
-            onClick={() => setShowAddMenu(true)} 
-            className="bg-white text-slate-950 font-black uppercase tracking-[0.2em] py-4 px-12 rounded-full transition-all shadow-xl active:scale-95"
-          >
-            Add Contact
-          </button>
+          <p className="text-slate-400 mb-6 max-w-xs mx-auto text-sm leading-relaxed font-medium">Start adding some clients so I can get to work for you!</p>
+          <ol className="space-y-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-8">
+            <li className="flex items-center justify-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[9px]">1</span>
+              Add contacts
+            </li>
+            <li className="flex items-center justify-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[9px]">2</span>
+              Set cadence
+            </li>
+            <li className="flex items-center justify-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[9px]">3</span>
+              Get next-touch prompts
+            </li>
+          </ol>
+          <div className="flex flex-col items-center gap-3">
+            <button 
+              onClick={() => setShowAddMenu(true)} 
+              className="bg-white text-slate-950 font-black uppercase tracking-[0.2em] py-4 px-12 rounded-full transition-all shadow-xl active:scale-95"
+            >
+              Add Contact
+            </button>
+            <button
+              onClick={() => setShowImportMenu(true)}
+              className="text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-full border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400 transition-colors"
+            >
+              Import contacts (CSV or Google)
+            </button>
+            {contactsCount === 0 && !sampleSeeded && (
+              <button
+                onClick={handleSeedSampleContacts}
+                disabled={sampleSeeding}
+                className="text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-full border border-emerald-500/40 text-emerald-300 hover:text-white hover:border-emerald-400 transition-colors disabled:opacity-50"
+              >
+                {sampleSeeding ? 'Seeding sample data…' : 'Try with sample data'}
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
@@ -1048,13 +1218,16 @@ const ContactsList: React.FC = () => {
     const [nextTouchFilter, setNextTouchFilter] = useState<'all' | 'due' | 'upcoming'>('all');
     const [sortMode, setSortMode] = useState<'name' | 'next-touch'>('name');
     const [showAddMenu, setShowAddMenu] = useState(false);
+    const [showImportMenu, setShowImportMenu] = useState(false);
     const navigate = useNavigate();
 
+    const refreshContacts = async () => {
+        const data = await dataService.getContacts();
+        setContacts(data);
+    };
+
     useEffect(() => {
-        void (async () => {
-            const data = await dataService.getContacts();
-            setContacts(data);
-        })();
+        void refreshContacts();
     }, []);
 
     const availableSegments = Array.from(
@@ -1145,9 +1318,23 @@ const ContactsList: React.FC = () => {
               </div>
             )}
 
+            <ImportContactsModal
+                isOpen={showImportMenu}
+                onClose={() => setShowImportMenu(false)}
+                onImported={() => void refreshContacts()}
+            />
+
             <div className="flex justify-between items-center mb-6 px-2">
                 <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Contacts</h1>
-                <button onClick={() => setShowAddMenu(true)} className="text-pink-500 text-[10px] font-black uppercase tracking-widest border border-pink-500/30 px-4 py-2 rounded-full hover:bg-pink-500/10 transition-colors">Record New</button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowImportMenu(true)}
+                        className="text-slate-300 text-[10px] font-black uppercase tracking-widest border border-slate-600/60 px-4 py-2 rounded-full hover:text-white hover:border-slate-400 transition-colors"
+                    >
+                        Import contacts (CSV or Google)
+                    </button>
+                    <button onClick={() => setShowAddMenu(true)} className="text-pink-500 text-[10px] font-black uppercase tracking-widest border border-pink-500/30 px-4 py-2 rounded-full hover:bg-pink-500/10 transition-colors">Record New</button>
+                </div>
             </div>
             <input type="text" placeholder="Search contacts..." className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full mb-6" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
