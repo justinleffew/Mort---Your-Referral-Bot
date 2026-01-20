@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Contact, ContactNote, GeneratedMessage, RadarState } from '../types';
 import { generateRadarMessage, determineAngle } from '../services/openaiService';
 import { dataService } from '../services/dataService';
+import { formatShortDate, getNextTouchDate, getNextTouchStatus } from '../utils/cadence';
 
 interface RadarCardProps {
     contact: Contact;
@@ -21,6 +22,20 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
     const [copyError, setCopyError] = useState<string | null>(null);
     const [showWhy, setShowWhy] = useState(false);
     const messageRef = useRef<HTMLTextAreaElement | null>(null);
+    const nextTouchDate = getNextTouchDate(contact);
+    const nextTouchStatus = getNextTouchStatus(nextTouchDate);
+
+    const nextTouchBadgeStyles = {
+        overdue: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+        due: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        upcoming: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    }[nextTouchStatus];
+
+    const nextTouchBadgeLabel = {
+        overdue: 'Overdue',
+        due: 'Due',
+        upcoming: 'Upcoming',
+    }[nextTouchStatus];
 
     useEffect(() => {
         loadPrompt();
@@ -97,7 +112,7 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                     </div>
                     <div>
                         <h3 className="font-bold text-white text-lg leading-tight">{contact.full_name}</h3>
-                        <div className="flex gap-2 items-center mt-1">
+                        <div className="flex flex-wrap gap-2 items-center mt-1">
                             {contact.mortgage_inference && (
                                 <span className="bg-pink-500/20 text-pink-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-pink-500/30">
                                     {contact.mortgage_inference.opportunity_tag}
@@ -108,6 +123,12 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                                     {contact.radar_interests[0]}
                                 </span>
                             )}
+                            <span className="text-[10px] font-semibold text-slate-400">
+                                Next touch: {formatShortDate(nextTouchDate)}
+                            </span>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${nextTouchBadgeStyles}`}>
+                                {nextTouchBadgeLabel}
+                            </span>
                         </div>
                     </div>
                 </div>

@@ -8,6 +8,7 @@ import CommuteMode from './components/CommuteMode';
 import AuthPanel from './components/AuthPanel';
 import { dataService } from './services/dataService';
 import { getSupabaseClient } from './services/supabaseClient';
+import { formatShortDate, getNextTouchDate, getNextTouchStatus } from './utils/cadence';
 import { Contact, ContactNote, Opportunity, RadarState, RealtorProfile, Touch, TouchType } from './types';
 
 const DEFAULT_CADENCE_DAYS = 90;
@@ -400,6 +401,19 @@ const ContactDetail: React.FC = () => {
 
     if (!contact) return null;
 
+    const nextTouchDate = getNextTouchDate(contact);
+    const nextTouchStatus = getNextTouchStatus(nextTouchDate);
+    const nextTouchBadgeStyles = {
+        overdue: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+        due: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        upcoming: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    }[nextTouchStatus];
+    const nextTouchBadgeLabel = {
+        overdue: 'Overdue',
+        due: 'Due',
+        upcoming: 'Upcoming',
+    }[nextTouchStatus];
+
     const DetailRow = ({ label, value, icon }: { label: string, value?: string, icon: React.ReactNode }) => (
         <div className="flex items-start gap-4 p-4 bg-slate-800/20 border border-white/5 rounded-2xl">
             <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-400">
@@ -526,7 +540,7 @@ const ContactDetail: React.FC = () => {
                             {touchSummary.quarterCount >= 1 ? 'On Track' : 'Due This Quarter'}
                         </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
                         <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">This Q</p>
                             <p className="text-xl font-black text-white">{touchSummary.quarterCount}</p>
@@ -540,6 +554,13 @@ const ContactDetail: React.FC = () => {
                             <p className="text-xs font-bold text-white">
                                 {touchSummary.lastTouch ? new Date(touchSummary.lastTouch).toLocaleDateString() : 'None'}
                             </p>
+                        </div>
+                        <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Next Touch</p>
+                            <p className="text-xs font-bold text-white">{formatShortDate(nextTouchDate)}</p>
+                            <span className={`mt-2 inline-block text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${nextTouchBadgeStyles}`}>
+                                {nextTouchBadgeLabel}
+                            </span>
                         </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
@@ -1025,6 +1046,8 @@ const ContactsList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [segmentFilter, setSegmentFilter] = useState('');
     const [tagsFilterInput, setTagsFilterInput] = useState('');
+    const [nextTouchFilter, setNextTouchFilter] = useState<'all' | 'due' | 'upcoming'>('all');
+    const [sortMode, setSortMode] = useState<'name' | 'next-touch'>('name');
     const [showAddMenu, setShowAddMenu] = useState(false);
     const navigate = useNavigate();
 
@@ -1043,19 +1066,45 @@ const ContactsList: React.FC = () => {
         .map(tag => tag.trim().toLowerCase())
         .filter(tag => tag.length > 0);
 
-    const filtered = contacts.filter(c => {
-        const matchesSearch =
-            c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.email?.toLowerCase().includes(searchTerm.toLowerCase());
-        if (!matchesSearch) return false;
-        if (segmentFilter && (c.segment || '').toLowerCase() !== segmentFilter.toLowerCase()) return false;
-        if (tagFilters.length > 0) {
-            const contactTags = (c.tags || []).map(tag => tag.toLowerCase());
-            const hasMatchingTag = tagFilters.some(tag => contactTags.includes(tag));
-            if (!hasMatchingTag) return false;
-        }
-        return true;
+    const contactEntries = contacts.map(contact => {
+        const nextTouchDate = getNextTouchDate(contact);
+        const nextTouchStatus = getNextTouchStatus(nextTouchDate);
+        return {
+            contact,
+            nextTouchDate,
+            nextTouchStatus,
+            nextTouchLabel: formatShortDate(nextTouchDate),
+        };
     });
+
+    const filtered = contactEntries
+        .filter(({ contact }) => {
+            const matchesSearch =
+                contact.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                contact.email?.toLowerCase().includes(searchTerm.toLowerCase());
+            if (!matchesSearch) return false;
+            if (segmentFilter && (contact.segment || '').toLowerCase() !== segmentFilter.toLowerCase()) return false;
+            if (tagFilters.length > 0) {
+                const contactTags = (contact.tags || []).map(tag => tag.toLowerCase());
+                const hasMatchingTag = tagFilters.some(tag => contactTags.includes(tag));
+                if (!hasMatchingTag) return false;
+            }
+            return true;
+        })
+        .filter(({ nextTouchStatus }) => {
+            if (nextTouchFilter === 'all') return true;
+            if (nextTouchFilter === 'due') return nextTouchStatus !== 'upcoming';
+            return nextTouchStatus === 'upcoming';
+        })
+        .sort((a, b) => {
+            if (sortMode === 'name') {
+                return a.contact.full_name.localeCompare(b.contact.full_name);
+            }
+            const aValue = a.nextTouchDate ? a.nextTouchDate.getTime() : Number.POSITIVE_INFINITY;
+            const bValue = b.nextTouchDate ? b.nextTouchDate.getTime() : Number.POSITIVE_INFINITY;
+            if (aValue !== bValue) return aValue - bValue;
+            return a.contact.full_name.localeCompare(b.contact.full_name);
+        });
 
     return (
         <div className="max-w-2xl mx-auto p-4 pb-24">
@@ -1102,7 +1151,7 @@ const ContactsList: React.FC = () => {
                 <button onClick={() => setShowAddMenu(true)} className="text-pink-500 text-[10px] font-black uppercase tracking-widest border border-pink-500/30 px-4 py-2 rounded-full hover:bg-pink-500/10 transition-colors">Record New</button>
             </div>
             <input type="text" placeholder="Search contacts..." className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full mb-6" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Segment</label>
                     <select
@@ -1126,6 +1175,29 @@ const ContactsList: React.FC = () => {
                         onChange={e => setTagsFilterInput(e.target.value)}
                     />
                 </div>
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Next touch</label>
+                    <select
+                        className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                        value={nextTouchFilter}
+                        onChange={e => setNextTouchFilter(e.target.value as 'all' | 'due' | 'upcoming')}
+                    >
+                        <option value="all">All</option>
+                        <option value="due">Due or overdue</option>
+                        <option value="upcoming">Upcoming</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Sort</label>
+                    <select
+                        className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                        value={sortMode}
+                        onChange={e => setSortMode(e.target.value as 'name' | 'next-touch')}
+                    >
+                        <option value="name">Name</option>
+                        <option value="next-touch">Next touch</option>
+                    </select>
+                </div>
             </div>
             <div className="bg-slate-800/40 border border-white/5 rounded-[2.5rem] overflow-hidden shadow-xl">
                 {filtered.length === 0 ? (
@@ -1133,23 +1205,35 @@ const ContactsList: React.FC = () => {
                         <p className="text-slate-500 font-medium">No contacts found.</p>
                     </div>
                 ) : (
-                    filtered.map(c => (
-                        <div key={c.id} className="p-6 flex justify-between items-center border-b border-white/5 hover:bg-white/5 transition-colors group cursor-pointer" onClick={() => navigate(`/contacts/${c.id}`)}>
+                    filtered.map(({ contact, nextTouchLabel, nextTouchStatus }) => (
+                        <div key={contact.id} className="p-6 flex justify-between items-center border-b border-white/5 hover:bg-white/5 transition-colors group cursor-pointer" onClick={() => navigate(`/contacts/${contact.id}`)}>
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center font-black text-indigo-400">
-                                    {c.full_name.charAt(0)}
+                                    {contact.full_name.charAt(0)}
                                 </div>
                                 <div>
-                                    <div className="font-bold text-white text-lg">{c.full_name || 'Unnamed Contact'}</div>
-                                    <div className="text-xs text-slate-500 flex gap-2">
-                                        {c.radar_interests.length > 0 ? c.radar_interests.slice(0, 2).map(i => <span key={i}>• {i}</span>) : <span>No interests noted</span>}
+                                    <div className="font-bold text-white text-lg">{contact.full_name || 'Unnamed Contact'}</div>
+                                    <div className="text-xs text-slate-500 flex flex-wrap gap-2">
+                                        {contact.radar_interests.length > 0 ? contact.radar_interests.slice(0, 2).map(i => <span key={i}>• {i}</span>) : <span>No interests noted</span>}
+                                        <span>• Next touch: {nextTouchLabel}</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                                <div className="text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-slate-400 transition-colors">{c.mortgage_inference?.opportunity_tag || 'Standard'}</div>
+                                <span
+                                    className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${
+                                        nextTouchStatus === 'overdue'
+                                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                            : nextTouchStatus === 'due'
+                                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                    }`}
+                                >
+                                    {nextTouchStatus === 'overdue' ? 'Overdue' : nextTouchStatus === 'due' ? 'Due' : 'Upcoming'}
+                                </span>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-slate-400 transition-colors">{contact.mortgage_inference?.opportunity_tag || 'Standard'}</div>
                                 <button 
-                                    onClick={() => navigate(`/contacts/edit/${c.id}`)}
+                                    onClick={() => navigate(`/contacts/edit/${contact.id}`)}
                                     className="p-2 bg-slate-900 border border-white/5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
