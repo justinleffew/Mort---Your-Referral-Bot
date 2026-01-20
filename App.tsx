@@ -1449,20 +1449,8 @@ const ContactsList: React.FC = () => {
     );
 };
 
-const personaOptions = [
-  { value: 'realtor', label: 'Realtor' },
-  { value: 'business_owner', label: 'Business Owner' },
-  { value: 'executive', label: 'Executive' },
-  { value: 'connector', label: 'Connector' },
-];
-
-const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: string) => void }> = ({
-    persona,
-    onPersonaChange,
-}) => {
+const Settings: React.FC = () => {
     const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
-    const [personaSelection, setPersonaSelection] = useState(persona);
-    const supabase = getSupabaseClient();
 
     useEffect(() => {
         void (async () => {
@@ -1471,10 +1459,6 @@ const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: strin
         })();
     }, []);
 
-    useEffect(() => {
-        setPersonaSelection(persona);
-    }, [persona]);
-    
     const save = async () => {
         await dataService.saveProfile(profile);
         alert('Settings Saved');
@@ -1495,23 +1479,6 @@ const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: strin
           setProfile(prev => ({ ...prev, headshot: reader.result as string }));
         };
         reader.readAsDataURL(file);
-      }
-    };
-
-    const handlePersonaChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
-      const nextPersona = event.target.value;
-      setPersonaSelection(nextPersona);
-      onPersonaChange(nextPersona);
-      localStorage.setItem('mort_persona', nextPersona);
-      if (supabase) {
-        const { error } = await supabase.auth.updateUser({
-          data: {
-            mort_persona: nextPersona,
-          },
-        });
-        if (error) {
-          console.warn('Failed to update persona', error);
-        }
       }
     };
 
@@ -1538,24 +1505,6 @@ const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: strin
         <div className="max-w-md mx-auto p-6 pb-24">
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-8">Preferences</h1>
             <div className="space-y-8">
-                <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-5">
-                    <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest">Persona</h2>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                        Switch how Mort is tailored. Your dashboard and prompts will adapt to the role you choose.
-                    </p>
-                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Current role</label>
-                    <select
-                        value={personaSelection}
-                        onChange={handlePersonaChange}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm"
-                    >
-                        {personaOptions.map(option => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                    </select>
-                </section>
                 <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
                     <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest">Co-Branding</h2>
                     <div className="flex items-center gap-6">
@@ -1680,257 +1629,6 @@ const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
 };
 
-const NonRealtorHome: React.FC<{ persona: string }> = ({ persona }) => {
-    const [contacts, setContacts] = useState<Contact[]>([]);
-    const [contactsLoading, setContactsLoading] = useState(true);
-
-    useEffect(() => {
-        let isMounted = true;
-        void (async () => {
-            const data = await dataService.getContacts();
-            if (isMounted) {
-                setContacts(data);
-                setContactsLoading(false);
-            }
-        })();
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-    const personaContentMap: Record<
-        string,
-        {
-            label: string;
-            headline: string;
-            intro: string;
-            cards: Array<{ title: string; body: string }>;
-            checklistTitle: string;
-            checklist: string[];
-        }
-    > = {
-        business_owner: {
-            label: 'Business Owners',
-            headline: 'Build your referral flywheel',
-            intro:
-                'Add the customers, vendors, and partners who drive repeat business. Mort will help you track who you trust, who refers you, and when to reach out.',
-            cards: [
-                {
-                    title: 'Add referral contacts',
-                    body: 'Capture your best clients, service partners, and power customers—anyone who can send warm intros or needs your services again.',
-                },
-                {
-                    title: 'Log the relationship context',
-                    body: 'Note what they buy from you, who they refer to, and the last project or milestone you shared together.',
-                },
-                {
-                    title: 'Set a follow-up rhythm',
-                    body: 'Schedule check-ins after jobs, anniversaries, or quarterly updates so referrals stay consistent.',
-                },
-            ],
-            checklistTitle: 'Referral contact checklist',
-            checklist: ['Company + role', 'How you met', 'Top referral triggers', 'Next touch date'],
-        },
-        executive: {
-            label: 'Executives',
-            headline: 'Keep your influence network warm',
-            intro:
-                'Track the board members, stakeholders, and strategic partners who move opportunities forward. Mort keeps high-stakes relationships on your radar.',
-            cards: [
-                {
-                    title: 'Add key stakeholders',
-                    body: 'List board members, investors, and cross-functional allies who can open doors or need your support.',
-                },
-                {
-                    title: 'Capture shared priorities',
-                    body: 'Log initiatives, executive goals, and personal touchpoints so outreach feels relevant and timely.',
-                },
-                {
-                    title: 'Plan executive touchpoints',
-                    body: 'Schedule quarterly updates, conference follow-ups, and milestone check-ins to stay visible.',
-                },
-            ],
-            checklistTitle: 'Executive contact checklist',
-            checklist: ['Organization + role', 'Strategic initiatives', 'Recent wins', 'Preferred cadence'],
-        },
-        connector: {
-            label: 'Connectors',
-            headline: 'Organize your introductions engine',
-            intro:
-                'Build a curated list of people you love to connect. Mort helps you remember who knows whom and the best time to make intros.',
-            cards: [
-                {
-                    title: 'Add referral-ready people',
-                    body: 'Include community leaders, event hosts, and trusted friends who are always sharing opportunities.',
-                },
-                {
-                    title: 'Track who helps who',
-                    body: 'Note the industries they serve, who they want to meet, and recent intros you facilitated.',
-                },
-                {
-                    title: 'Keep the loop warm',
-                    body: 'Follow up after every introduction and schedule light check-ins so your network stays active.',
-                },
-            ],
-            checklistTitle: 'Connector checklist',
-            checklist: ['Industry focus', 'Who they want to meet', 'Last intro made', 'Follow-up reminder'],
-        },
-    };
-
-    const content = personaContentMap[persona] ?? {
-        label: 'Leaders',
-        headline: 'Stay top of mind',
-        intro:
-            'Mort will help you keep warm relationships, remember follow-ups, and stay consistent with the people who matter most to your business.',
-        cards: [
-            {
-                title: 'Add referral contacts',
-                body: 'Capture the people you want to nurture and keep close.',
-            },
-        ],
-        checklistTitle: 'Quick checklist',
-        checklist: ['Name + role', 'Why they matter', 'Next touch date'],
-    };
-
-    return (
-        <div className="max-w-2xl mx-auto px-6 pb-12">
-            <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-                <div>
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Mort For {content.label}</p>
-                    <h1 className="text-3xl font-black text-white uppercase tracking-tighter mt-3">{content.headline}</h1>
-                    <p className="text-sm text-slate-400 mt-3 leading-relaxed">
-                        {content.intro}
-                    </p>
-                </div>
-                <div className="grid gap-4 text-xs font-bold text-slate-300">
-                    {content.cards.map(card => (
-                        <div key={card.title} className="bg-slate-950/70 border border-white/5 rounded-2xl p-5">
-                            <p className="uppercase tracking-widest text-xs text-slate-500">{card.title}</p>
-                            <p className="mt-3">{card.body}</p>
-                        </div>
-                    ))}
-                </div>
-                <div className="rounded-2xl border border-dashed border-slate-700 p-5 text-xs text-slate-400">
-                    <p className="font-bold uppercase tracking-widest text-xs text-slate-500">{content.checklistTitle}</p>
-                    <ul className="mt-3 space-y-2">
-                        {content.checklist.map(item => (
-                            <li key={item} className="flex items-center gap-2">
-                                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-pink-500"></span>
-                                <span>{item}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                <div className="space-y-4">
-                    <div>
-                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Mort Assist</p>
-                        <p className="text-xs text-slate-400 mt-2">
-                            Ask Mort for ideas, follow-ups, or notes about the contacts you have uploaded.
-                        </p>
-                    </div>
-                    {contactsLoading ? (
-                        <div className="text-xs text-slate-400">Loading your contacts...</div>
-                    ) : (
-                        <MortgageAssist mode="general" contacts={contacts} personaLabel={content.label} />
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => void }> = ({ children, onSignOut }) => {
-    const [showAddMenu, setShowAddMenu] = useState(false);
-    const navigate = useNavigate();
-
-    return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col">
-            {showAddMenu && (
-                <div className="fixed inset-0 z-[110] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
-                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowAddMenu(false)}></div>
-                    <div className="relative bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 space-y-4 shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
-                        <div className="text-center mb-6">
-                            <h3 className="text-xl font-black text-white uppercase tracking-tighter">Add Contact</h3>
-                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Choose your entry mode</p>
-                        </div>
-                        <button
-                            onClick={() => { navigate('/commute'); setShowAddMenu(false); }}
-                            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 p-6 rounded-3xl flex items-center gap-4 group hover:scale-[1.02] transition-transform shadow-xl"
-                        >
-                            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white">
-                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
-                            </div>
-                            <div className="text-left">
-                                <p className="text-white font-black uppercase text-xs tracking-widest">Brain Dump</p>
-                                <p className="text-white/60 text-xs font-bold">Fast voice ingestion</p>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => { navigate('/contacts/add'); setShowAddMenu(false); }}
-                            className="w-full bg-slate-800 border border-white/5 p-6 rounded-3xl flex items-center gap-4 group hover:bg-slate-700 transition-colors shadow-lg"
-                        >
-                            <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                            </div>
-                            <div className="text-left">
-                                <p className="text-white font-black uppercase text-xs tracking-widest">Manual Entry</p>
-                                <p className="text-slate-500 text-xs font-bold">Text & details</p>
-                            </div>
-                        </button>
-                        <button onClick={() => setShowAddMenu(false)} className="w-full text-slate-600 font-black uppercase text-xs tracking-[0.2em] pt-4">Cancel</button>
-                    </div>
-                </div>
-            )}
-            <header className="px-8 py-6 flex items-center justify-between max-w-2xl mx-auto w-full">
-                <Link to="/" className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
-                    <span className="text-2xl font-black text-white italic tracking-tighter">MORT</span>
-                </Link>
-                <div className="flex items-center gap-4">
-                    <Link
-                        to="/settings"
-                        className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
-                    >
-                        Preferences
-                    </Link>
-                    <button
-                        onClick={onSignOut}
-                        className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
-                    >
-                        Sign Out
-                    </button>
-                </div>
-            </header>
-            <div className="px-8 pb-6 max-w-2xl mx-auto w-full">
-                <div className="bg-slate-900/40 border border-white/10 rounded-3xl px-4 py-3 flex flex-wrap items-center gap-3 shadow-lg">
-                    <button
-                        onClick={() => setShowAddMenu(true)}
-                        className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md hover:scale-[1.02] transition-transform"
-                    >
-                        Add Contact
-                    </button>
-                    <button
-                        onClick={() => navigate('/contacts')}
-                        className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 text-slate-200 hover:text-white hover:border-white/30 transition"
-                    >
-                        Contacts
-                    </button>
-                    <button
-                        onClick={() => navigate('/')}
-                        className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 text-slate-200 hover:text-white hover:border-white/30 transition"
-                    >
-                        Mort Assist
-                    </button>
-                </div>
-            </div>
-            <main className="relative flex-1">
-                <div className="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
-                <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-cyan-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
-                {children}
-            </main>
-        </div>
-    );
-};
-
 const AuthCallback: React.FC = () => {
     return (
         <div className="max-w-md mx-auto px-6 py-16 text-center">
@@ -1948,7 +1646,6 @@ const AuthCallback: React.FC = () => {
 export default function App() {
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
-  const [persona, setPersona] = useState('realtor');
 
   useEffect(() => {
     if (!supabase) return;
@@ -1986,21 +1683,6 @@ export default function App() {
     };
   }, [supabase]);
 
-  useEffect(() => {
-    const metadataPersona = session?.user?.user_metadata?.mort_persona;
-    if (typeof metadataPersona === 'string' && metadataPersona.trim()) {
-      setPersona(metadataPersona);
-      localStorage.setItem('mort_persona', metadataPersona);
-      return;
-    }
-    const storedPersona = localStorage.getItem('mort_persona');
-    if (storedPersona) {
-      setPersona(storedPersona);
-    } else {
-      setPersona('realtor');
-    }
-  }, [session]);
-
   const handleSignOut = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -2009,45 +1691,27 @@ export default function App() {
   return (
     <HashRouter>
       {session ? (
-        persona === 'realtor' ? (
-            <Layout>
-                <div className="max-w-2xl mx-auto px-6 pb-6 flex justify-end">
-                    <button
-                        onClick={handleSignOut}
-                        className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
-                    >
-                        Sign Out
-                    </button>
-                </div>
-                <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
-                    <Route path="/commute" element={<CommuteMode />} />
-                    <Route path="/contacts" element={<ContactsList />} />
-                    <Route path="/contacts/add" element={<EditContact />} />
-                    <Route path="/contacts/edit/:id" element={<EditContact />} />
-                    <Route path="/contacts/:id" element={<ContactDetail />} />
-                    <Route path="/tools" element={<Calculator />} />
-                    <Route path="/settings" element={<Settings persona={persona} onPersonaChange={setPersona} />} />
-                </Routes>
-            </Layout>
-        ) : (
-            <NonRealtorLayout onSignOut={handleSignOut}>
-                <Routes>
-                    <Route path="/" element={<NonRealtorHome persona={persona} />} />
-                    <Route path="/commute" element={<CommuteMode />} />
-                    <Route path="/contacts" element={<ContactsList />} />
-                    <Route path="/contacts/add" element={<EditContact />} />
-                    <Route path="/contacts/edit/:id" element={<EditContact />} />
-                    <Route path="/contacts/:id" element={<ContactDetail />} />
-                    <Route path="/settings" element={<Settings persona={persona} onPersonaChange={setPersona} />} />
-                    <Route
-                        path="*"
-                        element={<NonRealtorHome persona={persona} />}
-                    />
-                </Routes>
-            </NonRealtorLayout>
-        )
+        <Layout>
+            <div className="max-w-2xl mx-auto px-6 pb-6 flex justify-end">
+                <button
+                    onClick={handleSignOut}
+                    className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                >
+                    Sign Out
+                </button>
+            </div>
+            <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
+                <Route path="/commute" element={<CommuteMode />} />
+                <Route path="/contacts" element={<ContactsList />} />
+                <Route path="/contacts/add" element={<EditContact />} />
+                <Route path="/contacts/edit/:id" element={<EditContact />} />
+                <Route path="/contacts/:id" element={<ContactDetail />} />
+                <Route path="/tools" element={<Calculator />} />
+                <Route path="/settings" element={<Settings />} />
+            </Routes>
+        </Layout>
       ) : (
         <AuthLayout>
           <Routes>
