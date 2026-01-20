@@ -89,6 +89,7 @@ export const generateRadarMessage = async (
         Family: ${contact.family_details.children.join(', ')}
         Notes (recent first): ${notesText || 'None'}
         ${mortgageContext}
+        Safe mode: ${contact.safe_mode ? 'on' : 'off'}
         Angle: ${angle}
 
         STRICT RULES:
@@ -98,6 +99,8 @@ export const generateRadarMessage = async (
         4. NO direct asks for referrals.
         5. Soft close: "Happy to help if you need anything."
         6. Reference their interests or inferred financial situation subtly.
+        7. Avoid sensitive topics (health/medical, politics, religion, legal issues, tragedies, or personal finances).
+        8. If safe mode is on, keep the message strictly neutral and avoid any potentially sensitive or personal assumptions.
 
         Output JSON: { "message": "string", "reason": "string explanation" }
         `;

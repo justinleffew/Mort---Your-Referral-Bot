@@ -132,6 +132,11 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                                     {contact.mortgage_inference.opportunity_tag}
                                 </span>
                             )}
+                            {contact.do_not_contact && (
+                                <span className="bg-rose-500/20 text-rose-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-rose-500/40">
+                                    Do not contact
+                                </span>
+                            )}
                             {contact.radar_interests.length > 0 && (
                                 <span className="bg-cyan-500/20 text-cyan-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-cyan-500/30">
                                     {contact.radar_interests[0]}
@@ -189,13 +194,15 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                 <div className="flex gap-3">
                     <button 
                         onClick={handleCopy}
-                        className={`flex-[2] py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950'}`}
+                        disabled={contact.do_not_contact}
+                        className={`flex-[2] py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950'} ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : ''}`}
                     >
                         {copied ? 'Copied' : 'Copy Message'}
                     </button>
                     <button 
                         onClick={handleSent}
-                        className="flex-1 py-4 bg-slate-900 border border-white/5 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
+                        disabled={contact.do_not_contact}
+                        className={`flex-1 py-4 bg-slate-900 border border-white/5 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : 'hover:text-white'}`}
                     >
                         Sent
                     </button>

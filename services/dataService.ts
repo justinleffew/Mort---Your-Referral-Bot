@@ -660,6 +660,7 @@ export const dataService = {
     return contacts
       .filter(contact => {
         if (contact.archived) return false;
+        if (contact.do_not_contact) return false;
         const state = radarStates.find(r => r.contact_id === contact.id);
         if (!state) return true;
         if (state.suppressed_until && new Date(state.suppressed_until) > today) return false;
@@ -691,18 +692,22 @@ export const dataService = {
   runNowOpportunities: async (): Promise<Opportunity[]> => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
+    const contacts = await dataService.getContacts();
+    const doNotContactIds = new Set(
+      contacts.filter(contact => contact.do_not_contact).map(contact => contact.id)
+    );
     if (supabase && userId) {
       const { data, error } = await supabase.functions.invoke('mort-run-now', {
-        body: {},
+        body: { exclude_do_not_contact: true },
       });
       if (error) {
         console.warn('Failed to run now', error);
         return [];
       }
       if (data && Array.isArray(data.opportunities)) {
-        return data.opportunities as Opportunity[];
+        return (data.opportunities as Opportunity[]).filter(opportunity => !doNotContactIds.has(opportunity.contact_id));
       }
-      return Array.isArray(data) ? (data as Opportunity[]) : [];
+      return Array.isArray(data) ? (data as Opportunity[]).filter(opportunity => !doNotContactIds.has(opportunity.contact_id)) : [];
     }
 
     return [];
