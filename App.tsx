@@ -425,6 +425,21 @@ const Dashboard: React.FC = () => {
                     </span>
                   )}
                 </div>
+                {opportunity.reasons?.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Why now</p>
+                    <div className="flex flex-wrap gap-2">
+                      {opportunity.reasons.map(reason => (
+                        <span
+                          key={`${opportunity.id}-${reason}`}
+                          className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-slate-950 text-slate-400 border border-white/5"
+                        >
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-3">
                   <select
                     value={selectedMessage}
