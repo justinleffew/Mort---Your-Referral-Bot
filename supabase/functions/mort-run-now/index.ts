@@ -32,8 +32,7 @@ const corsHeaders = {
 
 const getOpenAiKey = () =>
   Deno.env.get('OPENAI_SECRET_KEY') ??
-  Deno.env.get('OPENAI_API_KEY') ??
-  Deno.env.get('VITE_OPENAI_SECRET_KEY');
+  Deno.env.get('OPENAI_API_KEY');
 
 const buildFallbackMessages = (fullName: string) => {
   const firstName = fullName.split(' ')[0] || 'there';
