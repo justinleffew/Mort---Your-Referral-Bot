@@ -128,47 +128,56 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                         <h3 className="font-bold text-white text-lg leading-tight">{contact.full_name}</h3>
                         <div className="flex flex-wrap gap-2 items-center mt-1">
                             {contact.mortgage_inference && (
-                                <span className="bg-pink-500/20 text-pink-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-pink-500/30">
+                                <span className="bg-pink-500/20 text-pink-400 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-pink-500/30">
                                     {contact.mortgage_inference.opportunity_tag}
                                 </span>
                             )}
                             {contact.do_not_contact && (
-                                <span className="bg-rose-500/20 text-rose-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-rose-500/40">
+                                <span className="bg-rose-500/20 text-rose-300 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-rose-500/40">
                                     Do not contact
                                 </span>
                             )}
                             {contact.radar_interests.length > 0 && (
-                                <span className="bg-cyan-500/20 text-cyan-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-cyan-500/30">
+                                <span className="bg-cyan-500/20 text-cyan-400 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-cyan-500/30">
                                     {contact.radar_interests[0]}
                                 </span>
                             )}
-                            <span className="text-[10px] font-semibold text-slate-400">
+                            <span className="text-xs font-semibold text-slate-400">
                                 Next touch: {formatShortDate(nextTouchDate)}
                             </span>
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${nextTouchBadgeStyles}`}>
+                            <span className={`text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${nextTouchBadgeStyles}`}>
                                 {nextTouchBadgeLabel}
                             </span>
                         </div>
                     </div>
                 </div>
-                <button onClick={onDismiss} className="p-2 text-slate-600 hover:text-red-400">
+                <button
+                    onClick={onDismiss}
+                    aria-label="Dismiss card"
+                    className="p-2 text-slate-600 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
 
             <div className="bg-slate-900/60 rounded-3xl p-5 mb-5 border border-white/5">
                 <div className="flex justify-between items-center mb-3">
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">
+                    <span className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
                         {generated?.angle.replace(/_/g, ' ')}
                     </span>
-                    <button onClick={() => setShowWhy(!showWhy)} className="text-[10px] font-bold text-slate-500 hover:text-slate-300">DETAILS</button>
+                    <button
+                        onClick={() => setShowWhy(!showWhy)}
+                        className="text-xs font-bold text-slate-500 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                    >
+                        Details
+                    </button>
                 </div>
                 
                 {showWhy && (
                     <div className="mb-4 space-y-2 border-l-2 border-pink-500/30 pl-4 py-1">
                         <p className="text-xs text-slate-400 font-medium italic">{generated?.reason}</p>
                         {contact.mortgage_inference && (
-                            <p className="text-[10px] text-pink-400/80 font-bold uppercase tracking-tighter">
+                            <p className="text-sm text-pink-300/80 font-semibold">
                                 Reasoning: {contact.mortgage_inference.reasoning}
                             </p>
                         )}
@@ -195,20 +204,20 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                     <button 
                         onClick={handleCopy}
                         disabled={contact.do_not_contact}
-                        className={`flex-[2] py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950'} ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : ''}`}
+                        className={`flex-[2] py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950'} ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : ''}`}
                     >
                         {copied ? 'Copied' : 'Copy Message'}
                     </button>
                     <button 
                         onClick={handleSent}
                         disabled={contact.do_not_contact}
-                        className={`flex-1 py-4 bg-slate-900 border border-white/5 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : 'hover:text-white'}`}
+                        className={`flex-1 py-4 bg-slate-900 border border-white/5 text-slate-400 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : 'hover:text-white'}`}
                     >
                         Sent
                     </button>
                 </div>
                 {copyError && (
-                    <p className="mt-2 text-[10px] font-semibold text-amber-400">
+                    <p className="mt-2 text-xs font-semibold text-amber-400">
                         {copyError}
                     </p>
                 )}

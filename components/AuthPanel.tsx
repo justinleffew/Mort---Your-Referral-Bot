@@ -92,13 +92,13 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
     <section className="max-w-md mx-auto p-6 pb-0">
       <div className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Secure Access</p>
+          <p className="text-xs font-black uppercase tracking-widest text-slate-500">Secure Access</p>
           <h2 className="text-2xl font-black text-white uppercase tracking-tighter mt-2">Sign In</h2>
           <p className="text-xs text-slate-400 mt-2">Create an account or use your email to continue.</p>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Email</label>
+            <label className="text-xs font-black uppercase tracking-widest text-slate-500">Email</label>
             <input
               type="email"
               value={email}
@@ -108,7 +108,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
             />
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Password</label>
+            <label className="text-xs font-black uppercase tracking-widest text-slate-500">Password</label>
             <input
               type="password"
               value={password}
@@ -122,14 +122,14 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
           <button
             onClick={handleSignUpClick}
             disabled={!email || !password || !supabase}
-            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black uppercase text-xs py-4 rounded-2xl transition disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black uppercase text-xs py-4 rounded-2xl transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
             {isSubmitting ? 'Working...' : 'Sign Up'}
           </button>
           <button
             onClick={handleSignIn}
             disabled={!email || !password || !supabase}
-            className="w-full bg-slate-800 text-white font-black uppercase text-xs py-4 rounded-2xl border border-white/10 transition disabled:opacity-50"
+            className="w-full bg-slate-800 text-white font-black uppercase text-xs py-4 rounded-2xl border border-white/10 transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
             {isSubmitting ? 'Working...' : 'Sign In'}
           </button>
@@ -145,7 +145,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowPersonaModal(false)}></div>
           <div className="relative w-full max-w-sm rounded-[2.5rem] border border-white/10 bg-slate-900 p-8 shadow-2xl space-y-5">
             <div className="text-center">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Set your Mort persona</p>
+              <p className="text-xs font-black uppercase tracking-widest text-slate-500">Set your Mort persona</p>
               <h3 className="text-xl font-black text-white uppercase tracking-tighter mt-2">How do you use Mort?</h3>
               <p className="text-xs text-slate-400 mt-2">We’ll tailor your experience after sign up.</p>
             </div>
@@ -160,7 +160,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
                   key={option.value}
                   type="button"
                   onClick={() => setPersona(option.value)}
-                  className={`w-full rounded-2xl border px-4 py-3 uppercase tracking-widest transition ${
+                  className={`w-full rounded-2xl border px-4 py-3 uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
                     persona === option.value
                       ? 'border-pink-500 bg-pink-500/10 text-white'
                       : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
@@ -173,13 +173,13 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
             <div className="grid gap-3">
               <button
                 onClick={handlePersonaConfirm}
-                className="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 py-4 text-xs font-black uppercase text-white transition"
+                className="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 py-4 text-xs font-black uppercase text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               >
                 Continue to Sign Up
               </button>
               <button
                 onClick={() => setShowPersonaModal(false)}
-                className="w-full rounded-2xl border border-white/10 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                className="w-full rounded-2xl border border-white/10 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               >
                 Cancel
               </button>

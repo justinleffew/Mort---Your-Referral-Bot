@@ -110,7 +110,7 @@ const ImportContactsModal: React.FC<{
           </div>
           <div>
             <p className="text-white font-black uppercase text-xs tracking-widest">Upload CSV</p>
-            <p className="text-slate-500 text-[10px] font-bold">Use Name, Email, Phone headers</p>
+            <p className="text-slate-500 text-xs font-bold">Use Name, Email, Phone headers</p>
           </div>
           <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvUpload} />
         </label>
@@ -124,25 +124,25 @@ const ImportContactsModal: React.FC<{
           </div>
           <div>
             <p className="text-white font-black uppercase text-xs tracking-widest">Connect Google</p>
-            <p className="text-slate-500 text-[10px] font-bold">Coming soon</p>
+            <p className="text-slate-500 text-xs font-bold">Coming soon</p>
           </div>
         </button>
         {isImporting && (
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">
+          <div className="text-xs font-semibold text-slate-400 text-center">
             Importing…
           </div>
         )}
         {importError && (
-          <div className="text-[10px] font-bold uppercase tracking-widest text-rose-300 text-center">
+          <div className="text-xs font-semibold text-rose-300 text-center">
             {importError}
           </div>
         )}
         {importResult && (
-          <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-300 text-center">
+          <div className="text-xs font-semibold text-emerald-300 text-center">
             {importResult.added} added · {importResult.updated} updated · {importResult.skipped} skipped
           </div>
         )}
-        <button onClick={onClose} className="w-full text-slate-600 font-black uppercase text-[10px] tracking-[0.2em] pt-2">
+        <button onClick={onClose} className="w-full text-slate-600 font-black uppercase text-xs tracking-[0.2em] pt-2">
           Close
         </button>
       </div>
@@ -301,7 +301,7 @@ const Dashboard: React.FC = () => {
                </div>
                <div className="text-left">
                   <p className="text-white font-black uppercase text-xs tracking-widest">Brain Dump</p>
-                  <p className="text-white/60 text-[10px] font-bold">Fast voice ingestion</p>
+                  <p className="text-white/60 text-xs font-bold">Fast voice ingestion</p>
                </div>
             </button>
             <button 
@@ -313,10 +313,10 @@ const Dashboard: React.FC = () => {
                </div>
                <div className="text-left">
                   <p className="text-white font-black uppercase text-xs tracking-widest">Manual Entry</p>
-                  <p className="text-slate-500 text-[10px] font-bold">Text & details</p>
+                  <p className="text-slate-500 text-xs font-bold">Text & details</p>
                </div>
             </button>
-            <button onClick={() => setShowAddMenu(false)} className="w-full text-slate-600 font-black uppercase text-[10px] tracking-[0.2em] pt-4">Cancel</button>
+            <button onClick={() => setShowAddMenu(false)} className="w-full text-slate-600 font-black uppercase text-xs tracking-[0.2em] pt-4">Cancel</button>
           </div>
         </div>
       )}
@@ -329,7 +329,7 @@ const Dashboard: React.FC = () => {
 
       <div className="bg-slate-900/40 border border-white/5 rounded-[2.5rem] p-6 mb-8 flex items-center justify-between shadow-2xl">
           <div className="flex-1">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-2">Radar Coverage</h4>
+            <h4 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] mb-2">Radar Coverage</h4>
             <div className="flex items-center gap-3">
               <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-pink-500 to-indigo-500 transition-all duration-1000" style={{ width: `${stats.percent}%` }}></div>
@@ -348,7 +348,7 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-wrap items-center justify-end gap-3 mb-6 px-2">
         <button
           onClick={() => setShowImportMenu(true)}
-          className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400 transition-colors"
+          className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400 transition-colors"
         >
           Import contacts (CSV or Google)
         </button>
@@ -357,17 +357,17 @@ const Dashboard: React.FC = () => {
       <div className="flex justify-between items-center mb-6 px-2">
           <div>
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter">This week&apos;s opportunities</h1>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cadence: {cadenceLabel}</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cadence: {cadenceLabel}</p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={handleRunNow}
               disabled={runNowLoading}
-              className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-indigo-500/40 text-indigo-300 hover:text-white hover:border-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border border-indigo-500/40 text-indigo-300 hover:text-white hover:border-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {runNowLoading ? 'Running…' : 'Run Now'}
             </button>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{dueThisWeekCount} Due</span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dueThisWeekCount} Due</span>
           </div>
       </div>
 
@@ -381,7 +381,7 @@ const Dashboard: React.FC = () => {
         <div className="space-y-4 mb-10">
           <div className="flex items-center justify-between px-2">
             <h2 className="text-sm font-black text-white uppercase tracking-widest">Run Now Opportunities</h2>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
               {runNowOpportunities.length} Returned
             </span>
           </div>
@@ -399,28 +399,28 @@ const Dashboard: React.FC = () => {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-white font-black text-lg">{opportunity.contact_full_name ?? 'Contact'}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Score {opportunity.score}</p>
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Score {opportunity.score}</p>
                   </div>
                   <button
                     onClick={() => handleMarkContacted(opportunity.contact_id, selectedMessage)}
-                    className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                   >
                     Mark as contacted
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {typeof daysSince === 'number' && (
-                    <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-slate-800 text-slate-300">
+                    <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-slate-800 text-slate-300">
                       Touched {daysSince} days ago
                     </span>
                   )}
                   {opportunity.year_cap_exceeded && (
-                    <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                       Exceeds 4/year
                     </span>
                   )}
                   {opportunity.cadence_violation && (
-                    <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                       Inside cadence (set to {cadenceDaysValue} days)
                     </span>
                   )}
@@ -445,11 +445,11 @@ const Dashboard: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => handleCopyMessage(selectedMessage)}
-                      className="flex-1 bg-indigo-500/90 text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-2xl"
+                      className="flex-1 bg-indigo-500/90 text-white text-xs font-black uppercase tracking-widest py-3 rounded-2xl"
                     >
                       Copy message
                     </button>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
                       {opportunity.suggested_messages?.length ?? 0} variants
                     </span>
                   </div>
@@ -471,17 +471,17 @@ const Dashboard: React.FC = () => {
           </div>
           <h3 className="text-2xl font-black text-white mb-3">Radar Empty</h3>
           <p className="text-slate-400 mb-6 max-w-xs mx-auto text-sm leading-relaxed font-medium">Start adding some clients so I can get to work for you!</p>
-          <ol className="space-y-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-8">
+          <ol className="space-y-2 text-xs font-bold uppercase tracking-widest text-slate-400 mb-8">
             <li className="flex items-center justify-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[9px]">1</span>
+              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-xs">1</span>
               Add contacts
             </li>
             <li className="flex items-center justify-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[9px]">2</span>
+              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-xs">2</span>
               Set cadence
             </li>
             <li className="flex items-center justify-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[9px]">3</span>
+              <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-xs">3</span>
               Get next-touch prompts
             </li>
           </ol>
@@ -494,7 +494,7 @@ const Dashboard: React.FC = () => {
             </button>
             <button
               onClick={() => setShowImportMenu(true)}
-              className="text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-full border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400 transition-colors"
+              className="text-xs font-black uppercase tracking-widest px-6 py-2 rounded-full border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400 transition-colors"
             >
               Import contacts (CSV or Google)
             </button>
@@ -502,7 +502,7 @@ const Dashboard: React.FC = () => {
               <button
                 onClick={handleSeedSampleContacts}
                 disabled={sampleSeeding}
-                className="text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-full border border-emerald-500/40 text-emerald-300 hover:text-white hover:border-emerald-400 transition-colors disabled:opacity-50"
+                className="text-xs font-black uppercase tracking-widest px-6 py-2 rounded-full border border-emerald-500/40 text-emerald-300 hover:text-white hover:border-emerald-400 transition-colors disabled:opacity-50"
               >
                 {sampleSeeding ? 'Seeding sample data…' : 'Try with sample data'}
               </button>
@@ -589,7 +589,7 @@ const ContactDetail: React.FC = () => {
                 {icon}
             </div>
             <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-0.5">{label}</p>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-0.5">{label}</p>
                 <p className="text-white font-bold">{value || 'Not provided'}</p>
             </div>
         </div>
@@ -654,7 +654,7 @@ const ContactDetail: React.FC = () => {
                 <button onClick={() => navigate('/contacts')} className="p-2 text-slate-400 hover:text-white">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
                 </button>
-                <button onClick={() => navigate(`/contacts/edit/${contact.id}`)} className="text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-400/30 px-6 py-2 rounded-full">
+                <button onClick={() => navigate(`/contacts/edit/${contact.id}`)} className="text-indigo-400 text-xs font-black uppercase tracking-widest border border-indigo-400/30 px-6 py-2 rounded-full">
                     Edit
                 </button>
             </div>
@@ -665,7 +665,7 @@ const ContactDetail: React.FC = () => {
                 </div>
                 <h1 className="text-3xl font-black text-white uppercase tracking-tighter">{contact.full_name}</h1>
                 {contact.mortgage_inference && (
-                    <span className="inline-block bg-pink-500/20 text-pink-400 text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest border border-pink-500/30">
+                    <span className="inline-block bg-pink-500/20 text-pink-400 text-xs font-black px-4 py-1 rounded-full uppercase tracking-widest border border-pink-500/30">
                         {contact.mortgage_inference.opportunity_tag}
                     </span>
                 )}
@@ -683,7 +683,7 @@ const ContactDetail: React.FC = () => {
                     icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>}
                 />
                 <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Radar Interests</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Radar Interests</p>
                     <div className="flex flex-wrap gap-2">
                         {contact.radar_interests.length > 0 ? (
                             contact.radar_interests.map((interest, i) => (
@@ -698,14 +698,14 @@ const ContactDetail: React.FC = () => {
                 </div>
                 {contact.mortgage_inference && (
                     <div className="p-6 bg-pink-500/5 border border-pink-500/10 rounded-3xl space-y-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-pink-500">Mortgage Inference</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-pink-500">Mortgage Inference</p>
                         <p className="text-white font-bold text-sm leading-relaxed">{contact.mortgage_inference.reasoning}</p>
                     </div>
                 )}
                 <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
                     <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Touch Cadence</p>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Touch Cadence</p>
+                        <span className="text-xs font-black uppercase tracking-widest text-emerald-400">
                             {touchSummary.quarterCount >= 1 ? 'On Track' : 'Due This Quarter'}
                         </span>
                     </div>
@@ -727,29 +727,29 @@ const ContactDetail: React.FC = () => {
                         <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Next Touch</p>
                             <p className="text-xs font-bold text-white">{formatShortDate(nextTouchDate)}</p>
-                            <span className={`mt-2 inline-block text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${nextTouchBadgeStyles}`}>
+                            <span className={`mt-2 inline-block text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${nextTouchBadgeStyles}`}>
                                 {nextTouchBadgeLabel}
                             </span>
                         </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                        <button onClick={() => logTouch('call')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-white/5">
+                        <button onClick={() => logTouch('call')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-xs font-black uppercase tracking-widest border border-white/5">
                             Called
                         </button>
-                        <button onClick={() => logTouch('text')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-white/5">
+                        <button onClick={() => logTouch('text')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-xs font-black uppercase tracking-widest border border-white/5">
                             Texted
                         </button>
-                        <button onClick={() => logTouch('email')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-white/5">
+                        <button onClick={() => logTouch('email')} className="py-2 rounded-xl bg-slate-900 text-slate-200 text-xs font-black uppercase tracking-widest border border-white/5">
                             Emailed
                         </button>
                     </div>
                 </div>
                 <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
                     <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cadence Settings</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Cadence Settings</p>
                         <button
                             onClick={() => handleCadenceUpdate(profileCadenceDays, 'AUTO')}
-                            className="text-[10px] font-black uppercase tracking-widest text-indigo-300 border border-indigo-400/30 px-3 py-1 rounded-full"
+                            className="text-xs font-black uppercase tracking-widest text-indigo-300 border border-indigo-400/30 px-3 py-1 rounded-full"
                         >
                             Use profile cadence
                         </button>
@@ -759,7 +759,7 @@ const ContactDetail: React.FC = () => {
                             <button
                                 key={`cadence-${option}`}
                                 onClick={() => handleCadenceUpdate(option, 'MANUAL')}
-                                className={`px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                className={`px-3 py-2 rounded-full text-xs font-black uppercase tracking-widest border ${
                                     cadenceSelection === option
                                         ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40'
                                         : 'bg-slate-900 text-slate-400 border-white/5'
@@ -785,7 +785,7 @@ const ContactDetail: React.FC = () => {
                                     void handleCadenceUpdate(parsed, 'MANUAL');
                                 }
                             }}
-                            className="px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-200 text-[10px] font-black uppercase tracking-widest border border-indigo-500/40"
+                            className="px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-200 text-xs font-black uppercase tracking-widest border border-indigo-500/40"
                         >
                             Set
                         </button>
@@ -813,8 +813,8 @@ const ContactDetail: React.FC = () => {
                 </div>
                 <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
                     <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Notes</p>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">{notes.length} Total</span>
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Notes</p>
+                        <span className="text-xs font-black uppercase tracking-widest text-indigo-400">{notes.length} Total</span>
                     </div>
                     <textarea
                         value={noteDraft}
@@ -824,7 +824,7 @@ const ContactDetail: React.FC = () => {
                     />
                     <button
                         onClick={handleAddNote}
-                        className="w-full bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-2xl shadow-lg"
+                        className="w-full bg-indigo-500 text-white text-xs font-black uppercase tracking-widest py-3 rounded-2xl shadow-lg"
                     >
                         Save Note
                     </button>
@@ -834,7 +834,7 @@ const ContactDetail: React.FC = () => {
                         ) : (
                             notes.slice(0, 3).map(note => (
                                 <div key={note.id} className="text-xs text-slate-300 bg-slate-900/40 border border-white/5 rounded-xl px-3 py-2">
-                                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
                                         {new Date(note.created_at).toLocaleDateString()}
                                     </p>
                                     <p className="mt-1">{note.note_text}</p>
@@ -845,8 +845,8 @@ const ContactDetail: React.FC = () => {
                 </div>
                 <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
                     <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Timeline</p>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Touches + Notes</span>
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Timeline</p>
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-400">Touches + Notes</span>
                     </div>
                     <div className="space-y-2">
                         {timelineItems.length === 0 ? (
@@ -856,7 +856,7 @@ const ContactDetail: React.FC = () => {
                                 <div key={item.id} className="flex items-start justify-between gap-3 text-xs text-slate-300 bg-slate-900/40 border border-white/5 rounded-xl px-3 py-2">
                                     <div>
                                         <p className="font-bold uppercase tracking-widest">{item.label}</p>
-                                        <p className="text-slate-500 text-[11px] mt-1">{item.detail}</p>
+                                        <p className="text-slate-500 text-xs mt-1">{item.detail}</p>
                                     </div>
                                     <span className="text-slate-500">{new Date(item.created_at).toLocaleDateString()}</span>
                                 </div>
@@ -960,7 +960,7 @@ const EditContact: React.FC = () => {
 
             <div className="bg-slate-800/40 border border-white/5 rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">First Name</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">First Name</label>
                     <input 
                         type="text" 
                         value={firstName} 
@@ -971,7 +971,7 @@ const EditContact: React.FC = () => {
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Last Name</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Last Name</label>
                     <input 
                         type="text" 
                         value={lastName} 
@@ -982,7 +982,7 @@ const EditContact: React.FC = () => {
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Email</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Email</label>
                     <input 
                         type="email" 
                         value={contact.email || ''} 
@@ -993,7 +993,7 @@ const EditContact: React.FC = () => {
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Phone</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Phone</label>
                     <input 
                         type="tel" 
                         value={contact.phone || ''} 
@@ -1004,7 +1004,7 @@ const EditContact: React.FC = () => {
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Segment</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Segment</label>
                     <select
                         value={contact.segment || ''}
                         onChange={e => setContact({ ...contact, segment: e.target.value })}
@@ -1017,10 +1017,10 @@ const EditContact: React.FC = () => {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests + Tags</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests + Tags</label>
                     <div className="rounded-2xl border border-slate-700 bg-slate-900/40 p-4 space-y-4">
                         <div>
-                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests</label>
+                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests</label>
                             <textarea
                                 value={interestsInput}
                                 onChange={e => setInterestsInput(e.target.value)}
@@ -1039,12 +1039,12 @@ const EditContact: React.FC = () => {
                                 autoCapitalize="sentences"
                                 rows={1}
                             />
-                            <p className="text-[11px] text-slate-500 mt-2">Spell check is enabled for interest entries.</p>
+                            <p className="text-xs text-slate-500 mt-2">Spell check is enabled for interest entries.</p>
                         </div>
                         {interests.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 {interests.map(interest => (
-                                    <span key={interest} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/60 text-[11px] font-bold uppercase tracking-widest text-slate-200">
+                                    <span key={interest} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/60 text-xs font-bold uppercase tracking-widest text-slate-200">
                                         {interest}
                                         <button
                                             type="button"
@@ -1059,7 +1059,7 @@ const EditContact: React.FC = () => {
                             </div>
                         )}
                         <div>
-                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma separated)</label>
+                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma separated)</label>
                             <textarea
                                 value={tagsInput}
                                 onChange={e => setTagsInput(e.target.value)}
@@ -1127,12 +1127,12 @@ const Calculator: React.FC = () => {
   if (showMode) {
     return (
       <div className="fixed inset-0 z-[100] bg-slate-950 p-6 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300 overflow-y-auto">
-        <button onClick={() => setShowMode(false)} className="absolute top-6 right-6 text-slate-500 uppercase font-black text-[10px] tracking-widest bg-slate-900 border border-white/5 px-6 py-3 rounded-full active:scale-95 transition-all">Exit Presentation</button>
+        <button onClick={() => setShowMode(false)} className="absolute top-6 right-6 text-slate-500 uppercase font-black text-xs tracking-widest bg-slate-900 border border-white/5 px-6 py-3 rounded-full active:scale-95 transition-all">Exit Presentation</button>
         <div className="w-full max-w-lg space-y-10 text-center my-auto">
           <div className="space-y-4">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500">Total Monthly Payment</h4>
+            <h4 className="text-xs font-black uppercase tracking-[0.5em] text-pink-500">Total Monthly Payment</h4>
             <div className="text-9xl font-black text-white tracking-tighter tabular-nums">${Math.round(totalMonthly).toLocaleString()}</div>
-            <div className="flex justify-center gap-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+            <div className="flex justify-center gap-6 text-xs font-black text-slate-500 uppercase tracking-widest">
               <span>P&I: ${Math.round(monthlyPI)}</span>
               <span>Taxes: ${Math.round(monthlyTaxes)}</span>
               <span>Ins: ${Math.round(monthlyInsurance)}</span>
@@ -1141,17 +1141,17 @@ const Calculator: React.FC = () => {
           </div>
           <div className="bg-slate-900 border border-white/5 p-10 rounded-[3rem] space-y-8 shadow-2xl">
              <div className="space-y-4">
-                <div className="flex justify-between items-end px-2"><label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Price</label><span className="text-3xl font-black text-white">${price.toLocaleString()}</span></div>
+                <div className="flex justify-between items-end px-2"><label className="text-xs font-black uppercase tracking-widest text-slate-500">Price</label><span className="text-3xl font-black text-white">${price.toLocaleString()}</span></div>
                 <input type="range" min="100000" max="2000000" step="10000" value={price} onChange={e => setPrice(Number(e.target.value))} className="w-full h-4 bg-slate-800 rounded-full appearance-none cursor-pointer accent-pink-500" />
              </div>
              <div className="space-y-4">
-                <div className="flex justify-between items-end px-2"><label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Rate</label><span className="text-3xl font-black text-white">{rate}%</span></div>
+                <div className="flex justify-between items-end px-2"><label className="text-xs font-black uppercase tracking-widest text-slate-500">Rate</label><span className="text-3xl font-black text-white">{rate}%</span></div>
                 <input type="range" min="3" max="10" step="0.1" value={rate} onChange={e => setRate(Number(e.target.value))} className="w-full h-4 bg-slate-800 rounded-full appearance-none cursor-pointer accent-indigo-500" />
              </div>
           </div>
           <div className="pt-8 border-t border-white/5 flex items-center justify-center gap-4">
             {profile.headshot ? <img src={profile.headshot} className="w-16 h-16 rounded-full border-2 border-white/10" alt="Agent" /> : <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center font-black">{profile.name.charAt(0)}</div>}
-            <div className="text-left"><p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500">Consultant</p><p className="text-2xl font-black text-white tracking-tighter">{profile.name}</p></div>
+            <div className="text-left"><p className="text-xs font-black uppercase tracking-[0.3em] text-pink-500">Consultant</p><p className="text-2xl font-black text-white tracking-tighter">{profile.name}</p></div>
           </div>
         </div>
       </div>
@@ -1162,21 +1162,21 @@ const Calculator: React.FC = () => {
     <div className="max-w-md mx-auto p-6 space-y-6">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Quick Calc</h1>
-          <button onClick={() => setShowMode(true)} className="bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-full shadow-xl">Show Mode</button>
+          <button onClick={() => setShowMode(true)} className="bg-indigo-600 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-full shadow-xl">Show Mode</button>
         </div>
         <div className="bg-slate-800/60 backdrop-blur-md border border-white/10 rounded-[2.5rem] p-8 space-y-6">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Price</label><input type="number" value={price} onChange={e => setPrice(Number(e.target.value))} className={InputStyle} /></div>
+            <div><label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Price</label><input type="number" value={price} onChange={e => setPrice(Number(e.target.value))} className={InputStyle} /></div>
             <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Down %</label><input type="number" value={down} onChange={e => setDown(Number(e.target.value))} className={InputStyle} /></div>
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Rate</label><input type="number" step="0.1" value={rate} onChange={e => setRate(Number(e.target.value))} className={InputStyle} /></div>
+                <div><label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Down %</label><input type="number" value={down} onChange={e => setDown(Number(e.target.value))} className={InputStyle} /></div>
+                <div><label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Rate</label><input type="number" step="0.1" value={rate} onChange={e => setRate(Number(e.target.value))} className={InputStyle} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Taxes (annual)</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Taxes (annual)</label>
                     <input type="number" value={taxes} onChange={e => setTaxes(Number(e.target.value))} className={InputStyle} />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Insurance (monthly)</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Insurance (monthly)</label>
                     <input
                         type="number"
                         value={insurance}
@@ -1190,7 +1190,7 @@ const Calculator: React.FC = () => {
             </div>
             {isPmiRequired && (
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">PMI rate (annual %)</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">PMI rate (annual %)</label>
                     <input
                         type="number"
                         step="0.1"
@@ -1203,7 +1203,7 @@ const Calculator: React.FC = () => {
             )}
             <div className="pt-8 border-t border-white/5 mt-4 space-y-4">
                 <div className="flex justify-between items-center text-slate-400 font-bold px-1"><span>Total Monthly</span><span className="text-3xl font-black text-white">${Math.round(totalMonthly).toLocaleString()}</span></div>
-                <p className="text-[9px] text-slate-600 font-bold uppercase text-center tracking-widest">Estimates only. Not a quote.</p>
+                <p className="text-xs text-slate-600 font-semibold text-center">Estimates only. Not a quote.</p>
             </div>
         </div>
     </div>
@@ -1298,7 +1298,7 @@ const ContactsList: React.FC = () => {
                      </div>
                      <div className="text-left">
                         <p className="text-white font-black uppercase text-xs tracking-widest">Brain Dump</p>
-                        <p className="text-white/60 text-[10px] font-bold">Fast voice ingestion</p>
+                        <p className="text-white/60 text-xs font-bold">Fast voice ingestion</p>
                      </div>
                   </button>
                   <button 
@@ -1310,10 +1310,10 @@ const ContactsList: React.FC = () => {
                      </div>
                      <div className="text-left">
                         <p className="text-white font-black uppercase text-xs tracking-widest">Manual Entry</p>
-                        <p className="text-slate-500 text-[10px] font-bold">Text & details</p>
+                        <p className="text-slate-500 text-xs font-bold">Text & details</p>
                      </div>
                   </button>
-                  <button onClick={() => setShowAddMenu(false)} className="w-full text-slate-600 font-black uppercase text-[10px] tracking-[0.2em] pt-4">Cancel</button>
+                  <button onClick={() => setShowAddMenu(false)} className="w-full text-slate-600 font-black uppercase text-xs tracking-[0.2em] pt-4">Cancel</button>
                 </div>
               </div>
             )}
@@ -1329,17 +1329,17 @@ const ContactsList: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setShowImportMenu(true)}
-                        className="text-slate-300 text-[10px] font-black uppercase tracking-widest border border-slate-600/60 px-4 py-2 rounded-full hover:text-white hover:border-slate-400 transition-colors"
+                        className="text-slate-300 text-xs font-black uppercase tracking-widest border border-slate-600/60 px-4 py-2 rounded-full hover:text-white hover:border-slate-400 transition-colors"
                     >
                         Import contacts (CSV or Google)
                     </button>
-                    <button onClick={() => setShowAddMenu(true)} className="text-pink-500 text-[10px] font-black uppercase tracking-widest border border-pink-500/30 px-4 py-2 rounded-full hover:bg-pink-500/10 transition-colors">Record New</button>
+                    <button onClick={() => setShowAddMenu(true)} className="text-pink-500 text-xs font-black uppercase tracking-widest border border-pink-500/30 px-4 py-2 rounded-full hover:bg-pink-500/10 transition-colors">Record New</button>
                 </div>
             </div>
             <input type="text" placeholder="Search contacts..." className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full mb-6" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Segment</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Segment</label>
                     <select
                         className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
                         value={segmentFilter}
@@ -1352,7 +1352,7 @@ const ContactsList: React.FC = () => {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags</label>
                     <input
                         type="text"
                         placeholder="Filter by tag (comma separated)"
@@ -1362,7 +1362,7 @@ const ContactsList: React.FC = () => {
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Next touch</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Next touch</label>
                     <select
                         className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
                         value={nextTouchFilter}
@@ -1374,7 +1374,7 @@ const ContactsList: React.FC = () => {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Sort</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Sort</label>
                     <select
                         className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
                         value={sortMode}
@@ -1407,7 +1407,7 @@ const ContactsList: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
                                 <span
-                                    className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${
+                                    className={`text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${
                                         nextTouchStatus === 'overdue'
                                             ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                                             : nextTouchStatus === 'due'
@@ -1417,9 +1417,10 @@ const ContactsList: React.FC = () => {
                                 >
                                     {nextTouchStatus === 'overdue' ? 'Overdue' : nextTouchStatus === 'due' ? 'Due' : 'Upcoming'}
                                 </span>
-                                <div className="text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-slate-400 transition-colors">{contact.mortgage_inference?.opportunity_tag || 'Standard'}</div>
+                                <div className="text-xs font-black uppercase tracking-widest text-slate-600 group-hover:text-slate-400 transition-colors">{contact.mortgage_inference?.opportunity_tag || 'Standard'}</div>
                                 <button 
                                     onClick={() => navigate(`/contacts/edit/${contact.id}`)}
+                                    aria-label={`Edit ${contact.full_name || 'contact'}`}
                                     className="p-2 bg-slate-900 border border-white/5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -1523,11 +1524,11 @@ const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: strin
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-8">Preferences</h1>
             <div className="space-y-8">
                 <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-5">
-                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Persona</h2>
+                    <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest">Persona</h2>
                     <p className="text-xs text-slate-400 leading-relaxed">
                         Switch how Mort is tailored. Your dashboard and prompts will adapt to the role you choose.
                     </p>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Current role</label>
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Current role</label>
                     <select
                         value={personaSelection}
                         onChange={handlePersonaChange}
@@ -1541,7 +1542,7 @@ const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: strin
                     </select>
                 </section>
                 <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
-                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Co-Branding</h2>
+                    <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest">Co-Branding</h2>
                     <div className="flex items-center gap-6">
                       <div className="relative group">
                         <div className="w-20 h-20 rounded-full bg-slate-950 border border-white/5 flex items-center justify-center overflow-hidden">
@@ -1553,17 +1554,17 @@ const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: strin
                         </label>
                       </div>
                       <div className="flex-1">
-                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block">Agent Name</label>
+                        <label className="text-xs font-black text-slate-500 uppercase mb-2 block">Agent Name</label>
                         <input type="text" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm" />
                       </div>
                     </div>
                 </section>
                 <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
-                   <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Touch Cadence</h2>
+                   <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest">Touch Cadence</h2>
                    <p className="text-xs text-slate-400 leading-relaxed">
                         Choose how often you want follow-ups. This cadence drives radar eligibility and the due-this-week count.
                    </p>
-                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cadence</label>
+                   <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Cadence</label>
                    <select
                       value={profile.cadence_type ?? DEFAULT_PROFILE.cadence_type}
                       onChange={handleCadenceChange}
@@ -1577,7 +1578,7 @@ const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: strin
                    </select>
                    {profile.cadence_type === 'custom' && (
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Custom days</label>
+                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Custom days</label>
                         <input
                           type="number"
                           min={1}
@@ -1594,13 +1595,13 @@ const Settings: React.FC<{ persona: string; onPersonaChange: (nextPersona: strin
                    )}
                 </section>
                 <section className="bg-slate-800/40 border border-white/5 p-8 rounded-[2.5rem] space-y-4">
-                   <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">AI Engine</h2>
+                   <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest">AI Engine</h2>
                    <p className="text-xs text-slate-400 leading-relaxed">
                         AI requests are handled through the app account. There is no user-facing API key to manage.
                    </p>
                    <button onClick={save} className="w-full bg-indigo-600 text-white font-black uppercase text-xs py-4 rounded-xl">Save Preferences</button>
                 </section>
-                <button onClick={handleReset} className="w-full text-red-500 font-black uppercase text-[10px] tracking-widest pt-4">Delete All Data</button>
+                <button onClick={handleReset} className="w-full text-red-500 font-black uppercase text-xs tracking-widest pt-4">Delete All Data</button>
             </div>
         </div>
     );
@@ -1613,11 +1614,11 @@ const BottomNav: React.FC = () => {
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-slate-950/90 backdrop-blur-2xl border-t border-white/5 px-8 py-4 flex justify-between items-center max-w-2xl mx-auto rounded-t-[3rem] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
-            <Link to="/" className={navItemClass('/')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 9.5V21h5v-6h5v6h5V9.5L12 2z"/></svg><span className="text-[9px] font-black uppercase tracking-tighter">Radar</span></Link>
-            <Link to="/mort" className={navItemClass('/mort')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg><span className="text-[9px] font-black uppercase tracking-tighter">Mort</span></Link>
-            <Link to="/contacts" className={navItemClass('/contacts')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span className="text-[9px] font-black uppercase tracking-tighter">Contacts</span></Link>
-            <Link to="/tools" className={navItemClass('/tools')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><span className="text-[9px] font-black uppercase tracking-tighter">Calc</span></Link>
-            <Link to="/settings" className={navItemClass('/settings')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg><span className="text-[9px] font-black uppercase tracking-tighter">Prefs</span></Link>
+            <Link to="/" className={navItemClass('/')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 9.5V21h5v-6h5v6h5V9.5L12 2z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Radar</span></Link>
+            <Link to="/mort" className={navItemClass('/mort')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Mort</span></Link>
+            <Link to="/contacts" className={navItemClass('/contacts')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Contacts</span></Link>
+            <Link to="/tools" className={navItemClass('/tools')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Calc</span></Link>
+            <Link to="/settings" className={navItemClass('/settings')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg><span className="text-xs font-black uppercase tracking-tighter">Prefs</span></Link>
         </nav>
     );
 };
@@ -1779,7 +1780,7 @@ const NonRealtorHome: React.FC<{ persona: string }> = ({ persona }) => {
         <div className="max-w-2xl mx-auto px-6 pb-12">
             <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mort For {content.label}</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Mort For {content.label}</p>
                     <h1 className="text-3xl font-black text-white uppercase tracking-tighter mt-3">{content.headline}</h1>
                     <p className="text-sm text-slate-400 mt-3 leading-relaxed">
                         {content.intro}
@@ -1788,13 +1789,13 @@ const NonRealtorHome: React.FC<{ persona: string }> = ({ persona }) => {
                 <div className="grid gap-4 text-xs font-bold text-slate-300">
                     {content.cards.map(card => (
                         <div key={card.title} className="bg-slate-950/70 border border-white/5 rounded-2xl p-5">
-                            <p className="uppercase tracking-widest text-[10px] text-slate-500">{card.title}</p>
+                            <p className="uppercase tracking-widest text-xs text-slate-500">{card.title}</p>
                             <p className="mt-3">{card.body}</p>
                         </div>
                     ))}
                 </div>
                 <div className="rounded-2xl border border-dashed border-slate-700 p-5 text-xs text-slate-400">
-                    <p className="font-bold uppercase tracking-widest text-[10px] text-slate-500">{content.checklistTitle}</p>
+                    <p className="font-bold uppercase tracking-widest text-xs text-slate-500">{content.checklistTitle}</p>
                     <ul className="mt-3 space-y-2">
                         {content.checklist.map(item => (
                             <li key={item} className="flex items-center gap-2">
@@ -1806,7 +1807,7 @@ const NonRealtorHome: React.FC<{ persona: string }> = ({ persona }) => {
                 </div>
                 <div className="space-y-4">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mort Assist</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Mort Assist</p>
                         <p className="text-xs text-slate-400 mt-2">
                             Ask Mort for ideas, follow-ups, or notes about the contacts you have uploaded.
                         </p>
@@ -1845,7 +1846,7 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
                             </div>
                             <div className="text-left">
                                 <p className="text-white font-black uppercase text-xs tracking-widest">Brain Dump</p>
-                                <p className="text-white/60 text-[10px] font-bold">Fast voice ingestion</p>
+                                <p className="text-white/60 text-xs font-bold">Fast voice ingestion</p>
                             </div>
                         </button>
                         <button
@@ -1857,10 +1858,10 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
                             </div>
                             <div className="text-left">
                                 <p className="text-white font-black uppercase text-xs tracking-widest">Manual Entry</p>
-                                <p className="text-slate-500 text-[10px] font-bold">Text & details</p>
+                                <p className="text-slate-500 text-xs font-bold">Text & details</p>
                             </div>
                         </button>
-                        <button onClick={() => setShowAddMenu(false)} className="w-full text-slate-600 font-black uppercase text-[10px] tracking-[0.2em] pt-4">Cancel</button>
+                        <button onClick={() => setShowAddMenu(false)} className="w-full text-slate-600 font-black uppercase text-xs tracking-[0.2em] pt-4">Cancel</button>
                     </div>
                 </div>
             )}
@@ -1872,13 +1873,13 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
                 <div className="flex items-center gap-4">
                     <Link
                         to="/settings"
-                        className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                        className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
                     >
                         Preferences
                     </Link>
                     <button
                         onClick={onSignOut}
-                        className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                        className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
                     >
                         Sign Out
                     </button>
@@ -1888,19 +1889,19 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
                 <div className="bg-slate-900/40 border border-white/10 rounded-3xl px-4 py-3 flex flex-wrap items-center gap-3 shadow-lg">
                     <button
                         onClick={() => setShowAddMenu(true)}
-                        className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md hover:scale-[1.02] transition-transform"
+                        className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md hover:scale-[1.02] transition-transform"
                     >
                         Add Contact
                     </button>
                     <button
                         onClick={() => navigate('/contacts')}
-                        className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 text-slate-200 hover:text-white hover:border-white/30 transition"
+                        className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 text-slate-200 hover:text-white hover:border-white/30 transition"
                     >
                         Contacts
                     </button>
                     <button
                         onClick={() => navigate('/')}
-                        className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 text-slate-200 hover:text-white hover:border-white/30 transition"
+                        className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 text-slate-200 hover:text-white hover:border-white/30 transition"
                     >
                         Mort Assist
                     </button>
@@ -1998,7 +1999,7 @@ export default function App() {
                 <div className="max-w-2xl mx-auto px-6 pb-6 flex justify-end">
                     <button
                         onClick={handleSignOut}
-                        className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
+                        className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition"
                     >
                         Sign Out
                     </button>

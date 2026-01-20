@@ -62,7 +62,7 @@ const MortgageAssist: React.FC<MortgageAssistProps> = ({
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-indigo-600 text-white font-black uppercase text-xs py-4 rounded-xl disabled:opacity-60"
+                        className="w-full bg-indigo-600 text-white font-black uppercase text-xs py-4 rounded-xl disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                     >
                         {loading ? 'Generating...' : buttonLabel}
                     </button>
