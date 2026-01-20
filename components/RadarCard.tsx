@@ -20,7 +20,6 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
     const [isEditing, setIsEditing] = useState(false);
     const [copied, setCopied] = useState(false);
     const [copyError, setCopyError] = useState<string | null>(null);
-    const [showWhy, setShowWhy] = useState(false);
     const messageRef = useRef<HTMLTextAreaElement | null>(null);
     const nextTouchDate = getNextTouchDate(contact);
     const nextTouchStatus = getNextTouchStatus(nextTouchDate);
@@ -165,24 +164,17 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                     <span className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
                         {generated?.angle.replace(/_/g, ' ')}
                     </span>
-                    <button
-                        onClick={() => setShowWhy(!showWhy)}
-                        className="text-xs font-bold text-slate-500 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-                    >
-                        Details
-                    </button>
                 </div>
                 
-                {showWhy && (
-                    <div className="mb-4 space-y-2 border-l-2 border-pink-500/30 pl-4 py-1">
-                        <p className="text-xs text-slate-400 font-medium italic">{generated?.reason}</p>
-                        {contact.mortgage_inference && (
-                            <p className="text-sm text-pink-300/80 font-semibold">
-                                Reasoning: {contact.mortgage_inference.reasoning}
-                            </p>
-                        )}
-                    </div>
-                )}
+                <div className="mb-4 space-y-2 border-l-2 border-pink-500/30 pl-4 py-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Why now</p>
+                    <p className="text-xs text-slate-400 font-medium italic">{generated?.reason}</p>
+                    {contact.mortgage_inference && (
+                        <p className="text-[10px] text-pink-400/80 font-bold uppercase tracking-tighter">
+                            Reasoning: {contact.mortgage_inference.reasoning}
+                        </p>
+                    )}
+                </div>
 
                 {isEditing ? (
                     <textarea 

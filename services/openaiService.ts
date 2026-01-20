@@ -129,6 +129,31 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
     }
 };
 
+export const generateBrainDumpFollowUps = async (transcript: string): Promise<string[]> => {
+    const ai = getAi();
+    if (!ai || !transcript.trim()) return [];
+
+    const prompt = `
+    You are Mort, a CRM assistant for real estate agents.
+    Find vague or overly broad details in this voice transcript and ask short, specific follow-up questions.
+    Examples of vague details: "sports", "music", "food", "travel", "business", "investing".
+    Ask for specificity that would enable proactive outreach (teams, artists, cuisines, destinations, companies, etc.).
+    If nothing is vague, return an empty array.
+
+    Transcript: "${transcript}"
+
+    Output JSON only: { "questions": ["..."] }
+    `;
+
+    try {
+        const data = await callOpenAiJson<{ questions?: string[] }>(ai.apiKey, prompt);
+        return data.questions?.map(question => String(question).trim()).filter(Boolean) || [];
+    } catch (e) {
+        console.error("Failed to generate brain dump follow-ups", e);
+        return [];
+    }
+};
+
 export const generateMortgageResponse = async (query: string): Promise<MortgageQueryResponse> => {
     const prompt = `
     You are Mort, a conservative, calm mortgage assistant. Talk to the AGENT.

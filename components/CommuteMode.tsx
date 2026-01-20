@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { processBrainDump } from '../services/openaiService';
+import { generateBrainDumpFollowUps, processBrainDump } from '../services/openaiService';
 import { dataService } from '../services/dataService';
 
 const CommuteMode: React.FC = () => {
@@ -11,6 +11,8 @@ const CommuteMode: React.FC = () => {
     const [speechSupported, setSpeechSupported] = useState(true);
     const [speechError, setSpeechError] = useState('');
     const [showManualEntry, setShowManualEntry] = useState(false);
+    const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+    const [isRefining, setIsRefining] = useState(false);
     const recognitionRef = useRef<any>(null);
     const navigate = useNavigate();
 
@@ -57,6 +59,22 @@ const CommuteMode: React.FC = () => {
             setIsRecording(true);
         }
     };
+
+    useEffect(() => {
+        if (!transcript.trim()) {
+            setFollowUpQuestions([]);
+            return;
+        }
+
+        const timeout = window.setTimeout(async () => {
+            setIsRefining(true);
+            const questions = await generateBrainDumpFollowUps(transcript);
+            setFollowUpQuestions(questions);
+            setIsRefining(false);
+        }, 900);
+
+        return () => window.clearTimeout(timeout);
+    }, [transcript]);
 
     const handleProcess = async () => {
         if (!transcript) return;
@@ -121,6 +139,27 @@ const CommuteMode: React.FC = () => {
                         {transcript || "Speak clearly... I'm listening for names, dates, and interests."}
                     </p>
                 </div>
+
+                {(isRefining || followUpQuestions.length > 0) && (
+                    <div className="w-full max-w-md rounded-[2rem] border border-indigo-500/30 bg-slate-950/70 px-6 py-5 text-sm text-slate-200">
+                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">
+                            <span>Mort Response</span>
+                            {isRefining && <span className="text-slate-500">Listening…</span>}
+                        </div>
+                        <p className="mt-3 text-slate-300">
+                            Tell me specific details so I can trigger real-time moments.
+                        </p>
+                        {followUpQuestions.length > 0 && (
+                            <ul className="mt-3 space-y-2 text-slate-100">
+                                {followUpQuestions.map(question => (
+                                    <li key={question} className="rounded-2xl bg-slate-900/60 px-4 py-2 text-sm font-semibold">
+                                        {question}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                )}
 
                 {!speechSupported && (
                     <button
