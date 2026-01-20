@@ -8,8 +8,6 @@ interface AuthPanelProps {
 const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [persona, setPersona] = useState('realtor');
-  const [showPersonaModal, setShowPersonaModal] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,7 +50,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
       options: {
         emailRedirectTo,
         data: {
-          mort_persona: persona,
+          mort_persona: 'realtor',
         },
       },
     });
@@ -64,16 +62,6 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
       setMessage('Sign up complete. You are now signed in.');
     }
     setIsSubmitting(false);
-  };
-
-  const handleSignUpClick = () => {
-    if (!email || !password || !supabase || isSubmitting) return;
-    setShowPersonaModal(true);
-  };
-
-  const handlePersonaConfirm = () => {
-    setShowPersonaModal(false);
-    void handleSignUp();
   };
 
   const handleSignIn = async () => {
@@ -120,7 +108,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
         </div>
         <div className="grid gap-3">
           <button
-            onClick={handleSignUpClick}
+            onClick={handleSignUp}
             disabled={!email || !password || !supabase}
             className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black uppercase text-xs py-4 rounded-2xl transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
@@ -140,53 +128,6 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
           </div>
         )}
       </div>
-      {showPersonaModal && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowPersonaModal(false)}></div>
-          <div className="relative w-full max-w-sm rounded-[2.5rem] border border-white/10 bg-slate-900 p-8 shadow-2xl space-y-5">
-            <div className="text-center">
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">Set your Mort persona</p>
-              <h3 className="text-xl font-black text-white uppercase tracking-tighter mt-2">How do you use Mort?</h3>
-              <p className="text-xs text-slate-400 mt-2">We’ll tailor your experience after sign up.</p>
-            </div>
-            <div className="grid gap-2 text-left text-xs font-bold">
-              {[
-                { value: 'realtor', label: 'Realtor' },
-                { value: 'business_owner', label: 'Business Owner' },
-                { value: 'executive', label: 'Executive' },
-                { value: 'connector', label: 'Connector' },
-              ].map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setPersona(option.value)}
-                  className={`w-full rounded-2xl border px-4 py-3 uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
-                    persona === option.value
-                      ? 'border-pink-500 bg-pink-500/10 text-white'
-                      : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="grid gap-3">
-              <button
-                onClick={handlePersonaConfirm}
-                className="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 py-4 text-xs font-black uppercase text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-              >
-                Continue to Sign Up
-              </button>
-              <button
-                onClick={() => setShowPersonaModal(false)}
-                className="w-full rounded-2xl border border-white/10 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 };
