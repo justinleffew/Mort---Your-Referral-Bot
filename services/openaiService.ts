@@ -1,44 +1,30 @@
 import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient, GeneralAssistResponse } from "../types";
+import { getSupabaseClient } from "./supabaseClient";
 
-type OpenAiConfig = {
-    apiKey: string;
+type EdgeFunctionResponse<T> = {
+    data?: T;
 };
 
-const OPENAI_MODEL = 'gpt-4o-mini';
-
-const getEnvApiKey = () => {
-    return import.meta.env.VITE_OPENAI_SECRET_KEY
-        ?? process.env.OPENAI_SECRET_KEY
-        ?? process.env.VITE_OPENAI_SECRET_KEY;
-};
-
-export const getAi = (): OpenAiConfig | null => {
-    const apiKey = getEnvApiKey();
-    if (!apiKey) return null;
-    return { apiKey };
-};
-
-const callOpenAiJson = async <T>(apiKey: string, prompt: string): Promise<T> => {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: OPENAI_MODEL,
-            messages: [{ role: 'user', content: prompt }],
-            response_format: { type: 'json_object' }
-        })
-    });
-
-    if (!response.ok) {
-        throw new Error(`OpenAI request failed: ${response.status}`);
+const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+        throw new Error('Supabase is not configured.');
     }
 
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content ?? '{}';
-    return JSON.parse(content) as T;
+    const { data, error } = await supabase.functions.invoke('mort-openai', {
+        body: { prompt }
+    });
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    const payload = data as EdgeFunctionResponse<T> | null;
+    if (!payload?.data) {
+        throw new Error('Invalid AI response.');
+    }
+
+    return payload.data;
 };
 
 export const determineAngle = (contact: Contact, notes: ContactNote[], usedAngles: string[]): RadarAngle => {
@@ -58,7 +44,6 @@ export const generateRadarMessage = async (
     angle: RadarAngle,
     notes: ContactNote[]
 ): Promise<GeneratedMessage> => {
-    const ai = getAi();
     const notesText = notes
         .slice(0, 5)
         .map(n => `${new Date(n.created_at).toLocaleDateString()}: ${n.note_text}`)
@@ -77,8 +62,6 @@ export const generateRadarMessage = async (
         light_value_framing: `Hi ${firstName}, seeing some interesting shifts in the market lately and thought of you. Hope you're doing well!`,
         equity_opportunity: `Hi ${firstName}, was looking at some data for ${contact.location_context || 'your area'} and thought of you. Hope things are great!`
     };
-
-    if (!ai) return { message: fallbacks[angle], reason: "Key missing", angle };
 
     try {
         const prompt = `
@@ -105,7 +88,7 @@ export const generateRadarMessage = async (
         Output JSON: { "message": "string", "reason": "string explanation" }
         `;
 
-        const json = await callOpenAiJson<{ message?: string; reason?: string }>(ai.apiKey, prompt);
+        const json = await callOpenAiJson<{ message?: string; reason?: string }>(prompt);
         return {
             message: json.message || fallbacks[angle],
             reason: json.reason || "Generated from context",
@@ -117,8 +100,7 @@ export const generateRadarMessage = async (
 };
 
 export const processBrainDump = async (transcript: string): Promise<BrainDumpClient[]> => {
-    const ai = getAi();
-    if (!ai || !transcript.trim()) return [];
+    if (!transcript.trim()) return [];
 
     const prompt = `
     You are "Mort," a backend data processing agent for a CRM app designed for Real Estate Agents.
@@ -139,7 +121,7 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
     `;
 
     try {
-        const data = await callOpenAiJson<{ clients?: BrainDumpClient[] }>(ai.apiKey, prompt);
+        const data = await callOpenAiJson<{ clients?: BrainDumpClient[] }>(prompt);
         return data.clients || [];
     } catch (e) {
         console.error("Failed to parse brain dump", e);
@@ -173,22 +155,24 @@ export const generateBrainDumpFollowUps = async (transcript: string): Promise<st
 };
 
 export const generateMortgageResponse = async (query: string): Promise<MortgageQueryResponse> => {
-    const ai = getAi();
-    if (!ai) return { buyer_script: "AI Key missing.", ballpark_numbers: "N/A", heads_up: "N/A", next_steps: "Check settings." };
-
     const prompt = `
     You are Mort, a conservative, calm mortgage assistant. Talk to the AGENT.
     Query: "${query}"
     Output JSON: buyer_script, ballpark_numbers, heads_up, next_steps.
     `;
 
-    const json = await callOpenAiJson<MortgageQueryResponse>(ai.apiKey, prompt);
-    return {
-        buyer_script: json.buyer_script || '',
-        ballpark_numbers: json.ballpark_numbers || '',
-        heads_up: json.heads_up || '',
-        next_steps: json.next_steps || ''
-    };
+    try {
+        const json = await callOpenAiJson<MortgageQueryResponse>(prompt);
+        return {
+            buyer_script: json.buyer_script || '',
+            ballpark_numbers: json.ballpark_numbers || '',
+            heads_up: json.heads_up || '',
+            next_steps: json.next_steps || ''
+        };
+    } catch (e) {
+        console.error("Failed to generate mortgage response", e);
+        return { buyer_script: "AI unavailable.", ballpark_numbers: "N/A", heads_up: "N/A", next_steps: "Check settings." };
+    }
 };
 
 const formatContactSummary = (contact: Contact) => {
@@ -211,9 +195,6 @@ export const generateGeneralAssistResponse = async (
     contacts: Contact[],
     personaLabel?: string
 ): Promise<GeneralAssistResponse> => {
-    const ai = getAi();
-    if (!ai) return { response: "AI Key missing." };
-
     const contactSummaries = contacts.slice(0, 30).map(formatContactSummary).join('\n');
     const prompt = `
     You are Mort, a helpful assistant for relationship-based referral management. The user persona is "${personaLabel || 'general user'}".
@@ -226,8 +207,13 @@ export const generateGeneralAssistResponse = async (
     Output JSON: { "response": "string" }
     `;
 
-    const json = await callOpenAiJson<GeneralAssistResponse>(ai.apiKey, prompt);
-    return {
-        response: json.response || ''
-    };
+    try {
+        const json = await callOpenAiJson<GeneralAssistResponse>(prompt);
+        return {
+            response: json.response || ''
+        };
+    } catch (e) {
+        console.error("Failed to generate general assist response", e);
+        return { response: "AI unavailable." };
+    }
 };
