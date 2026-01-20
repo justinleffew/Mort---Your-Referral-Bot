@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   PROFILE: 'mort_realtor_profile',
   TOUCHES: 'mort_touches',
   AGENT_ID: 'mort_agent_id',
+  SAMPLE_SEEDED: 'mort_sample_seeded',
 };
 
 const STORAGE_VERSION = 'v2';
@@ -799,6 +800,61 @@ export const dataService = {
     const withInterests = contacts.filter(c => c.radar_interests.length > 0).length;
     const percent = total === 0 ? 0 : Math.round((withInterests / total) * 100);
     return { total, withInterests, percent };
+  },
+
+  hasSeededSampleContacts: () => Boolean(localStorage.getItem(STORAGE_KEYS.SAMPLE_SEEDED)),
+
+  seedSampleContacts: async () => {
+    const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      console.warn('Skipping sample seed in Supabase mode.');
+      return { added: 0 };
+    }
+    if (dataService.hasSeededSampleContacts()) {
+      return { added: 0 };
+    }
+    const existingContacts = load<Contact>(STORAGE_KEYS.CONTACTS);
+    if (existingContacts.length > 0) {
+      return { added: 0 };
+    }
+    const samples: Partial<Contact>[] = [
+      {
+        full_name: 'Camila Reed',
+        email: 'camila.reed@example.com',
+        phone: '(415) 555-0142',
+        location_context: 'Looking for a condo near SoMa',
+        radar_interests: ['Move-up buyer', 'First-time buyer'],
+        segment: 'Hot',
+        tags: ['Referral', 'Finance'],
+        suggested_action: 'Send a quick check-in and share two listings.',
+      },
+      {
+        full_name: 'Marcus Lee',
+        email: 'marcus.lee@example.com',
+        phone: '(312) 555-0199',
+        location_context: 'Relocating from Chicago to Denver',
+        radar_interests: ['Relocation', 'Referral partner'],
+        segment: 'Warm',
+        tags: ['Partner'],
+        suggested_action: 'Ask for preferred neighborhoods and timing.',
+      },
+      {
+        full_name: 'Priya Patel',
+        email: 'priya.patel@example.com',
+        phone: '(206) 555-0177',
+        location_context: 'Thinking about refinancing this summer',
+        radar_interests: ['Refinance'],
+        segment: 'Nurture',
+        tags: ['Past client'],
+        suggested_action: 'Share rate watch update and offer a 15-min review.',
+      },
+    ];
+    for (const sample of samples) {
+      await dataService.addContact(sample);
+    }
+    localStorage.setItem(STORAGE_KEYS.SAMPLE_SEEDED, 'true');
+    return { added: samples.length };
   },
 
   getRadarStates: async (): Promise<RadarState[]> => {
