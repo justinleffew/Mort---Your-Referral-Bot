@@ -1645,10 +1645,10 @@ const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col">
             <header className="px-8 py-8 flex items-center justify-center">
-                <div className="flex items-center gap-3">
+                <Link to="/" className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
                     <span className="text-2xl font-black text-white italic tracking-tighter">MORT</span>
-                </div>
+                </Link>
             </header>
             <main className="relative flex-1 flex items-center justify-center px-6">
                 <div className="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
@@ -1865,10 +1865,10 @@ const NonRealtorLayout: React.FC<{ children: React.ReactNode; onSignOut: () => v
                 </div>
             )}
             <header className="px-8 py-6 flex items-center justify-between max-w-2xl mx-auto w-full">
-                <div className="flex items-center gap-3">
+                <Link to="/" className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
                     <span className="text-2xl font-black text-white italic tracking-tighter">MORT</span>
-                </div>
+                </Link>
                 <div className="flex items-center gap-4">
                     <Link
                         to="/settings"
