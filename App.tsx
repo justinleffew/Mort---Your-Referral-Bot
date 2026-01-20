@@ -112,7 +112,6 @@ const Dashboard: React.FC = () => {
   const handleReachedOut = async (contactId: string) => {
     const suppressUntil = new Date();
     suppressUntil.setDate(suppressUntil.getDate() + cadenceDays);
-    await dataService.addTouch(contactId, 'text', { channel: 'sms', source: 'radar' });
     await dataService.updateRadarState(contactId, {
       reached_out: true,
       reached_out_at: new Date().toISOString(),
@@ -153,8 +152,8 @@ const Dashboard: React.FC = () => {
     await navigator.clipboard.writeText(message);
   };
 
-  const handleMarkContacted = async (contactId: string) => {
-    await dataService.addTouch(contactId, 'reach_out', { channel: 'text', source: 'run_now' });
+  const handleMarkContacted = async (contactId: string, message: string) => {
+    await dataService.addTouch(contactId, 'reach_out', { channel: 'sms', body: message, source: 'run_now' });
   };
 
   return (
@@ -263,7 +262,7 @@ const Dashboard: React.FC = () => {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Score {opportunity.score}</p>
                   </div>
                   <button
-                    onClick={() => handleMarkContacted(opportunity.contact_id)}
+                    onClick={() => handleMarkContacted(opportunity.contact_id, selectedMessage)}
                     className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                   >
                     Mark as contacted
@@ -454,7 +453,7 @@ const ContactDetail: React.FC = () => {
             type: 'touch' as const,
             created_at: touch.created_at,
             label: touch.type,
-            detail: touch.channel || touch.source || 'Logged touch',
+            detail: touch.body || touch.channel || touch.source || 'Logged touch',
         })),
         ...notes.map(note => ({
             id: `note-${note.id}`,

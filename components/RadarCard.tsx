@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Contact, ContactNote, GeneratedMessage, RadarState } from '../types';
+import { Contact, ContactNote, GeneratedMessage, RadarState, TouchType } from '../types';
 import { generateRadarMessage, determineAngle } from '../services/openaiService';
 import { dataService } from '../services/dataService';
 
@@ -65,10 +65,19 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
         }, 0);
     };
 
+    const logTouch = async (type: TouchType) => {
+        await dataService.addTouch(contact.id, type, {
+            channel: 'sms',
+            body: editedMessage,
+            source: 'radar',
+        });
+    };
+
     const handleCopy = async () => {
         setCopyError(null);
 
         try {
+            await logTouch('text');
             await navigator.clipboard.writeText(editedMessage);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
@@ -77,6 +86,11 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
             setCopyError('Copy failed. Select the message and copy manually.');
             selectMessageForManualCopy();
         }
+    };
+
+    const handleSent = async () => {
+        await logTouch('text');
+        onReachedOut();
     };
 
     if (loading) {
@@ -159,7 +173,7 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                         {copied ? 'Copied' : 'Copy Message'}
                     </button>
                     <button 
-                        onClick={onReachedOut}
+                        onClick={handleSent}
                         className="flex-1 py-4 bg-slate-900 border border-white/5 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
                     >
                         Sent
