@@ -146,6 +146,18 @@ const getSupabaseUserId = async (supabase: ReturnType<typeof getSupabaseClient>)
   return data.user?.id ?? null;
 };
 
+const requireSupabaseUserId = async (
+  supabase: ReturnType<typeof getSupabaseClient>,
+  action: string
+) => {
+  if (!supabase) return null;
+  const userId = await getSupabaseUserId(supabase);
+  if (!userId) {
+    throw new Error(`Unable to ${action}: no authenticated user.`);
+  }
+  return userId;
+};
+
 const getAgentId = () => {
   const existing = localStorage.getItem(STORAGE_KEYS.AGENT_ID);
   if (existing) return existing;
@@ -218,7 +230,7 @@ export const dataService = {
 
   saveProfile: async (profile: RealtorProfile) => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
+    const userId = await requireSupabaseUserId(supabase, 'save profile');
     if (supabase && userId) {
       // Supabase mode.
       const { error } = await supabase.from('realtor_profiles').upsert({
@@ -284,39 +296,36 @@ export const dataService = {
 
   addContact: async (data: Partial<Contact>): Promise<Contact> => {
     const supabase = getSupabaseClient();
-    const agentId = getAgentId();
-    const userId = await getSupabaseUserId(supabase);
-    if (supabase && !userId) {
-      console.warn('No authenticated user available for contact insert');
-    }
-    const payload: Contact = normalizeContact({
-      id: uuid(),
-      user_id: userId ?? agentId,
-      full_name: data.full_name || 'Unknown',
-      phone: data.phone || '',
-      email: data.email || '',
-      location_context: data.location_context || '',
-      sale_date: data.sale_date,
-      last_contacted_at: data.last_contacted_at,
-      segment: data.segment || '',
-      tags: data.tags || [],
-      cadence_days: data.cadence_days ?? 90,
-      cadence_mode: data.cadence_mode ?? 'AUTO',
-      safe_mode: data.safe_mode ?? false,
-      do_not_contact: data.do_not_contact ?? false,
-      home_area_id: data.home_area_id ?? null,
-      comfort_level: data.comfort_level || 'maybe',
-      archived: false,
-      created_at: new Date().toISOString(),
-      radar_interests: data.radar_interests || [],
-      family_details: data.family_details || { children: [], pets: [] },
-      mortgage_inference: data.mortgage_inference,
-      suggested_action: data.suggested_action,
-    });
+    const userId = await requireSupabaseUserId(supabase, 'add contact');
+    const buildContact = (ownerId: string): Contact =>
+      normalizeContact({
+        id: uuid(),
+        user_id: ownerId,
+        full_name: data.full_name || 'Unknown',
+        phone: data.phone || '',
+        email: data.email || '',
+        location_context: data.location_context || '',
+        sale_date: data.sale_date,
+        last_contacted_at: data.last_contacted_at,
+        segment: data.segment || '',
+        tags: data.tags || [],
+        cadence_days: data.cadence_days ?? 90,
+        cadence_mode: data.cadence_mode ?? 'AUTO',
+        safe_mode: data.safe_mode ?? false,
+        do_not_contact: data.do_not_contact ?? false,
+        home_area_id: data.home_area_id ?? null,
+        comfort_level: data.comfort_level || 'maybe',
+        archived: false,
+        created_at: new Date().toISOString(),
+        radar_interests: data.radar_interests || [],
+        family_details: data.family_details || { children: [], pets: [] },
+        mortgage_inference: data.mortgage_inference,
+        suggested_action: data.suggested_action,
+      });
 
     if (supabase && userId) {
       // Supabase mode.
-      const supabasePayload = { ...payload, user_id: userId };
+      const supabasePayload = buildContact(userId);
       const { data: inserted, error } = await supabase
         .from('contacts')
         .insert(supabasePayload)
@@ -324,7 +333,7 @@ export const dataService = {
         .single();
       if (error) {
         console.warn('Failed to add contact', error);
-        return payload;
+        return supabasePayload;
       }
       await supabase.from('radar_state').insert({
         contact_id: inserted.id,
@@ -337,6 +346,8 @@ export const dataService = {
     }
 
     // LocalStorage fallback.
+    const agentId = getAgentId();
+    const payload = buildContact(agentId);
     const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
     contacts.push(payload);
     save(STORAGE_KEYS.CONTACTS, contacts);
@@ -368,7 +379,7 @@ export const dataService = {
 
   updateContact: async (id: string, data: Partial<Contact>) => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
+    const userId = await requireSupabaseUserId(supabase, 'update contact');
     if (supabase && userId) {
       // Supabase mode.
       const { error } = await supabase
@@ -415,22 +426,19 @@ export const dataService = {
 
   addNote: async (contactId: string, text: string) => {
     const supabase = getSupabaseClient();
-    const agentId = getAgentId();
-    const userId = await getSupabaseUserId(supabase);
-    if (supabase && !userId) {
-      console.warn('No authenticated user available for note insert');
-    }
-    const note: ContactNote = {
+    const userId = await requireSupabaseUserId(supabase, 'add note');
+    const buildNote = (ownerId: string): ContactNote => ({
       id: uuid(),
       contact_id: contactId,
-      user_id: userId ?? agentId,
+      user_id: ownerId,
       note_text: text,
       created_at: new Date().toISOString(),
-    };
+    });
 
     if (supabase && userId) {
       // Supabase mode.
-      const { error } = await supabase.from('contact_notes').insert({ ...note, user_id: userId });
+      const note = buildNote(userId);
+      const { error } = await supabase.from('contact_notes').insert(note);
       if (error) {
         console.warn('Failed to add note', error);
       }
@@ -438,6 +446,8 @@ export const dataService = {
     }
 
     // LocalStorage fallback.
+    const agentId = getAgentId();
+    const note = buildNote(agentId);
     const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
     notes.push(note);
     save(STORAGE_KEYS.NOTES, notes);
@@ -445,7 +455,7 @@ export const dataService = {
 
   updateNote: async (noteId: string, text: string) => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
+    const userId = await requireSupabaseUserId(supabase, 'update note');
     if (supabase && userId) {
       const { error } = await supabase
         .from('contact_notes')
@@ -468,7 +478,7 @@ export const dataService = {
 
   deleteNote: async (noteId: string) => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
+    const userId = await requireSupabaseUserId(supabase, 'delete note');
     if (supabase && userId) {
       const { error } = await supabase
         .from('contact_notes')
@@ -515,7 +525,7 @@ export const dataService = {
 
   updateRadarState: async (contactId: string, data: Partial<RadarState>) => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
+    const userId = await requireSupabaseUserId(supabase, 'update radar state');
     if (supabase && userId) {
       // Supabase mode.
       const { data: existing, error: loadError } = await supabase
@@ -589,25 +599,22 @@ export const dataService = {
     options?: { channel?: string; body?: string; source?: string }
   ) => {
     const supabase = getSupabaseClient();
-    const agentId = getAgentId();
-    const userId = await getSupabaseUserId(supabase);
-    if (supabase && !userId) {
-      console.warn('No authenticated user available for touch insert');
-    }
-    const touch: Touch = {
+    const userId = await requireSupabaseUserId(supabase, 'add touch');
+    const buildTouch = (ownerId: string): Touch => ({
       id: uuid(),
       contact_id: contactId,
-      user_id: userId ?? agentId,
+      user_id: ownerId,
       type,
       channel: options?.channel,
       body: options?.body,
       source: options?.source,
       created_at: new Date().toISOString(),
-    };
+    });
 
     if (supabase && userId) {
       // Supabase mode.
-      const { error } = await supabase.from('touches').insert({ ...touch, user_id: userId });
+      const touch = buildTouch(userId);
+      const { error } = await supabase.from('touches').insert(touch);
       if (error) {
         console.warn('Failed to add touch', error);
       }
@@ -620,6 +627,8 @@ export const dataService = {
     }
 
     // LocalStorage fallback.
+    const agentId = getAgentId();
+    const touch = buildTouch(agentId);
     const touches = load<Touch>(STORAGE_KEYS.TOUCHES);
     touches.push(touch);
     save(STORAGE_KEYS.TOUCHES, touches);
