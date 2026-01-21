@@ -137,4 +137,5 @@ export interface BrainDumpClient {
   };
   mortgage_inference: MortgageInference;
   suggested_action: string;
+  tags: string[];
 }

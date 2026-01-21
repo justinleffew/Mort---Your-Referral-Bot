@@ -926,15 +926,37 @@ const EditContact: React.FC = () => {
     const [lastName, setLastName] = useState('');
     const [interestsInput, setInterestsInput] = useState('');
     const [interests, setInterests] = useState<string[]>([]);
-    const [tagsInput, setTagsInput] = useState('');
-    const segmentOptions = [
-        { value: 'past client', label: 'Past Client' },
-        { value: 'friend', label: 'Friend' },
-        { value: 'family', label: 'Family' },
-        { value: 'good referral source', label: 'Good Referral Source' },
-        { value: 'investor', label: 'Investor' },
-        { value: 'other', label: 'Other' },
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const primaryTagOptions = [
+        'Past Client',
+        'Friend',
+        'Family',
+        'Good Referral Source',
+        'Investor',
+        'Other',
     ];
+    const secondaryTagOptions = [
+        'Professional Partner',
+        'Neighbor',
+        'Sphere of Influence',
+        'Community Worker',
+        'Local Business Owner',
+        'High Trust',
+        'Low Trust',
+        'Bad Experience',
+        'Influencer/Connector',
+        'Luxury/HNW',
+        'Fitness/Health Focused',
+        'Sports Connection',
+        'Faith-Oriented',
+        'Prefers Texting',
+        'Loves to talk',
+        'Detail-oriented',
+        'Decisive',
+        'Needs Reassurance',
+        'High Energy',
+    ];
+    const segmentOptions = ['', 'past client', 'friend', 'referral champ', 'other'];
     const isEditing = Boolean(id);
 
     useEffect(() => {
@@ -948,7 +970,7 @@ const EditContact: React.FC = () => {
                 setLastName(nameParts.slice(1).join(' '));
                 setInterests(data.radar_interests);
                 setInterestsInput('');
-                setTagsInput((data.tags || []).join(', '));
+                setSelectedTags(data.tags || []);
             }
         })();
     }, [id]);
@@ -968,6 +990,14 @@ const EditContact: React.FC = () => {
         setInterests(current => current.filter(interest => interest !== value));
     };
 
+    const handleToggleTag = (value: string) => {
+        setSelectedTags(current => (
+            current.includes(value)
+                ? current.filter(tag => tag !== value)
+                : [...current, value]
+        ));
+    };
+
     const handleSave = async () => {
         const finalName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
         if (!finalName) {
@@ -975,15 +1005,11 @@ const EditContact: React.FC = () => {
             return;
         }
         
-        const finalTags = tagsInput.split(',')
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
-
         const finalContact = {
             ...contact,
             full_name: finalName,
             radar_interests: interests,
-            tags: finalTags
+            tags: selectedTags
         };
         
         if (isEditing && id) {
@@ -1106,15 +1132,51 @@ const EditContact: React.FC = () => {
                             </div>
                         )}
                         <div>
-                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma separated)</label>
-                            <textarea
-                                value={tagsInput}
-                                onChange={e => setTagsInput(e.target.value)}
-                                className={`${InputStyle} min-h-[96px] resize-none`}
-                                placeholder="Investor, Repeat Client"
-                                autoComplete="off"
-                                rows={3}
-                            />
+                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">Primary Tags</label>
+                            <div className="flex flex-wrap gap-2">
+                                {primaryTagOptions.map(tag => {
+                                    const isSelected = selectedTags.includes(tag);
+                                    return (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => handleToggleTag(tag)}
+                                            className={`px-3 py-1 rounded-full border text-xs font-bold uppercase tracking-widest transition-colors ${
+                                                isSelected
+                                                    ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
+                                                    : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-indigo-400/50 hover:text-indigo-200'
+                                            }`}
+                                            aria-pressed={isSelected}
+                                        >
+                                            {tag}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">Secondary Tags</label>
+                            <div className="flex flex-wrap gap-2">
+                                {secondaryTagOptions.map(tag => {
+                                    const isSelected = selectedTags.includes(tag);
+                                    return (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => handleToggleTag(tag)}
+                                            className={`px-3 py-1 rounded-full border text-xs font-bold uppercase tracking-widest transition-colors ${
+                                                isSelected
+                                                    ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                                                    : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-emerald-400/50 hover:text-emerald-200'
+                                            }`}
+                                            aria-pressed={isSelected}
+                                        >
+                                            {tag}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-3">Selected tags: {selectedTags.length ? selectedTags.join(', ') : 'None yet'}</p>
                         </div>
                     </div>
                 </div>
