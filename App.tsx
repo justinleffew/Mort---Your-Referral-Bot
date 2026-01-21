@@ -899,8 +899,7 @@ const EditContact: React.FC = () => {
     // Separate local string state to prevent cursor jumping issues during input
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
-    const [interestsInput, setInterestsInput] = useState('');
-    const [interests, setInterests] = useState<string[]>([]);
+    const [contactNarrative, setContactNarrative] = useState('');
     const [tagsInput, setTagsInput] = useState('');
     const segmentOptions = ['', 'past client', 'friend', 'referral champ', 'other'];
     const isEditing = Boolean(id);
@@ -914,27 +913,11 @@ const EditContact: React.FC = () => {
                 const nameParts = data.full_name?.trim().split(/\s+/) ?? [];
                 setFirstName(nameParts[0] ?? '');
                 setLastName(nameParts.slice(1).join(' '));
-                setInterests(data.radar_interests);
-                setInterestsInput('');
+                setContactNarrative(data.radar_interests.join(', '));
                 setTagsInput((data.tags || []).join(', '));
             }
         })();
     }, [id]);
-
-    const handleAddInterest = (value: string) => {
-        const trimmed = value.trim();
-        if (!trimmed) return;
-        if (interests.some(interest => interest.toLowerCase() === trimmed.toLowerCase())) {
-            setInterestsInput('');
-            return;
-        }
-        setInterests(current => [...current, trimmed]);
-        setInterestsInput('');
-    };
-
-    const handleRemoveInterest = (value: string) => {
-        setInterests(current => current.filter(interest => interest !== value));
-    };
 
     const handleSave = async () => {
         const finalName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
@@ -950,7 +933,7 @@ const EditContact: React.FC = () => {
         const finalContact = {
             ...contact,
             full_name: finalName,
-            radar_interests: interests,
+            radar_interests: contactNarrative.trim() ? [contactNarrative.trim()] : [],
             tags: finalTags
         };
         
@@ -1035,44 +1018,20 @@ const EditContact: React.FC = () => {
                     <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests + Tags</label>
                     <div className="rounded-2xl border border-slate-700 bg-slate-900/40 p-4 space-y-4">
                         <div>
-                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests</label>
+                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Contact Story</label>
                             <textarea
-                                value={interestsInput}
-                                onChange={e => setInterestsInput(e.target.value)}
-                                onKeyDown={event => {
-                                    if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        handleAddInterest(interestsInput);
-                                    }
-                                }}
-                                onBlur={() => handleAddInterest(interestsInput)}
-                                className={`${InputStyle} min-h-[56px] resize-none`}
-                                placeholder="Type an interest and press Enter"
+                                value={contactNarrative}
+                                onChange={e => setContactNarrative(e.target.value)}
+                                className={`${InputStyle} min-h-[140px] resize-none`}
+                                placeholder="Tell me about this contact as if you were writing me a text."
                                 autoComplete="off"
                                 spellCheck={true}
                                 autoCorrect="on"
                                 autoCapitalize="sentences"
-                                rows={1}
+                                rows={5}
                             />
-                            <p className="text-xs text-slate-500 mt-2">Spell check is enabled for interest entries.</p>
+                            <p className="text-xs text-slate-500 mt-2">We’ll save this as one narrative so it can inspire future outreach.</p>
                         </div>
-                        {interests.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                                {interests.map(interest => (
-                                    <span key={interest} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/60 text-xs font-bold uppercase tracking-widest text-slate-200">
-                                        {interest}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveInterest(interest)}
-                                            className="text-slate-400 hover:text-white transition-colors"
-                                            aria-label={`Remove ${interest}`}
-                                        >
-                                            ×
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
                         <div>
                             <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma separated)</label>
                             <textarea
