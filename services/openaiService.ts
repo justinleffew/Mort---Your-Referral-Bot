@@ -129,28 +129,68 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
     }
 };
 
-export const generateBrainDumpFollowUps = async (transcript: string): Promise<string[]> => {
-    const ai = getAi();
-    if (!ai || !transcript.trim()) return [];
+const buildBrainDumpFollowUpFallback = (transcript: string) => {
+    const nameMatch = transcript.match(/\bnamed\s+([A-Z][a-z]+)|\bname(?:d)?\s+([A-Z][a-z]+)/i);
+    const possibleName = nameMatch?.[1] || nameMatch?.[2] || '';
+    const name = possibleName ? possibleName.trim() : '';
+    const sportMatch = transcript.match(/\b(football|soccer|basketball|baseball|hockey|tennis|golf)\b/i);
+    const sport = sportMatch ? sportMatch[1].toLowerCase() : '';
+
+    if (name && sport) {
+        return {
+            response: `Got it — what is ${name}'s last name and do they have a favorite ${sport} team? More information now means better touchpoints and more referrals for you!`,
+            questions: [
+                `What is ${name}'s last name?`,
+                `Do they have a favorite ${sport} team?`
+            ]
+        };
+    }
+
+    if (name) {
+        return {
+            response: `Got it — what is ${name}'s last name and any favorite interests or milestones to remember? More information now means better touchpoints and more referrals for you!`,
+            questions: [
+                `What is ${name}'s last name?`,
+                `Any favorite interests, teams, or milestones to note?`
+            ]
+        };
+    }
+
+    return {
+        response: "Got it — can you share their full name and one specific interest or milestone? More information now means better touchpoints and more referrals for you!",
+        questions: [
+            "What is their full name?",
+            "Any specific interests, teams, or milestones to remember?"
+        ]
+    };
+};
+
+export const generateBrainDumpFollowUps = async (transcript: string): Promise<{ response: string; questions: string[] }> => {
+    if (!transcript.trim()) return { response: '', questions: [] };
 
     const prompt = `
     You are Mort, a CRM assistant for real estate agents.
     Find vague or overly broad details in this voice transcript and ask short, specific follow-up questions.
     Examples of vague details: "sports", "music", "food", "travel", "business", "investing".
     Ask for specificity that would enable proactive outreach (teams, artists, cuisines, destinations, companies, etc.).
-    If nothing is vague, return an empty array.
+    Also provide one friendly response sentence that acknowledges what the agent said and explains why details help.
+    If nothing is vague, return an empty questions array but still provide the response sentence.
 
     Transcript: "${transcript}"
 
-    Output JSON only: { "questions": ["..."] }
+    Output JSON only: { "response": "string", "questions": ["..."] }
     `;
 
     try {
-        const data = await callOpenAiJson<{ questions?: string[] }>(ai.apiKey, prompt);
-        return data.questions?.map(question => String(question).trim()).filter(Boolean) || [];
+        const data = await callOpenAiJson<{ response?: string; questions?: string[] }>(prompt);
+        const questions = data.questions?.map(question => String(question).trim()).filter(Boolean) || [];
+        return {
+            response: data.response?.trim() || buildBrainDumpFollowUpFallback(transcript).response,
+            questions
+        };
     } catch (e) {
         console.error("Failed to generate brain dump follow-ups", e);
-        return [];
+        return buildBrainDumpFollowUpFallback(transcript);
     }
 };
 
