@@ -902,7 +902,14 @@ const EditContact: React.FC = () => {
     const [interestsInput, setInterestsInput] = useState('');
     const [interests, setInterests] = useState<string[]>([]);
     const [tagsInput, setTagsInput] = useState('');
-    const segmentOptions = ['', 'past client', 'friend', 'referral champ', 'other'];
+    const segmentOptions = [
+        { value: 'past client', label: 'Past Client' },
+        { value: 'friend', label: 'Friend' },
+        { value: 'family', label: 'Family' },
+        { value: 'good referral source', label: 'Good Referral Source' },
+        { value: 'investor', label: 'Investor' },
+        { value: 'other', label: 'Other' },
+    ];
     const isEditing = Boolean(id);
 
     useEffect(() => {
@@ -1019,15 +1026,15 @@ const EditContact: React.FC = () => {
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Segment</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">How do you know them?</label>
                     <select
                         value={contact.segment || ''}
                         onChange={e => setContact({ ...contact, segment: e.target.value })}
                         className={InputStyle}
                     >
                         <option value="">Unsegmented</option>
-                        {segmentOptions.filter(option => option).map(option => (
-                            <option key={option} value={option}>{option}</option>
+                        {segmentOptions.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                     </select>
                 </div>
