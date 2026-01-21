@@ -11,6 +11,7 @@ const CommuteMode: React.FC = () => {
     const [speechSupported, setSpeechSupported] = useState(true);
     const [speechError, setSpeechError] = useState('');
     const [showManualEntry, setShowManualEntry] = useState(false);
+    const [followUpResponse, setFollowUpResponse] = useState('');
     const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
     const [isRefining, setIsRefining] = useState(false);
     const recognitionRef = useRef<any>(null);
@@ -62,14 +63,16 @@ const CommuteMode: React.FC = () => {
 
     useEffect(() => {
         if (!transcript.trim()) {
+            setFollowUpResponse('');
             setFollowUpQuestions([]);
             return;
         }
 
         const timeout = window.setTimeout(async () => {
             setIsRefining(true);
-            const questions = await generateBrainDumpFollowUps(transcript);
-            setFollowUpQuestions(questions);
+            const followUp = await generateBrainDumpFollowUps(transcript);
+            setFollowUpResponse(followUp.response);
+            setFollowUpQuestions(followUp.questions);
             setIsRefining(false);
         }, 900);
 
@@ -140,14 +143,14 @@ const CommuteMode: React.FC = () => {
                     </p>
                 </div>
 
-                {(isRefining || followUpQuestions.length > 0) && (
+                {(isRefining || followUpQuestions.length > 0 || followUpResponse) && (
                     <div className="w-full max-w-md rounded-[2rem] border border-indigo-500/30 bg-slate-950/70 px-6 py-5 text-sm text-slate-200">
                         <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">
                             <span>Mort Response</span>
                             {isRefining && <span className="text-slate-500">Listening…</span>}
                         </div>
                         <p className="mt-3 text-slate-300">
-                            Tell me specific details so I can trigger real-time moments.
+                            {followUpResponse || 'Tell me specific details so I can trigger real-time moments.'}
                         </p>
                         {followUpQuestions.length > 0 && (
                             <ul className="mt-3 space-y-2 text-slate-100">
