@@ -108,24 +108,47 @@ const getAuthUser = async () => {
   return data.user ?? null;
 };
 
-const upsertProfileForUser = async (user: { id: string; user_metadata?: Record<string, any> }, nameOverride?: string) => {
+const upsertProfileForUser = async (
+  user: { id: string; user_metadata?: Record<string, any> },
+  nameOverride?: string
+) => {
   const supabase = getSupabaseClient();
   if (!supabase) return;
   const name = resolveProfileName(nameOverride, user.user_metadata);
-  const { error } = await supabase.from('realtor_profiles').upsert(
-    {
-      user_id: user.id,
-      name,
-      headshot: null,
-      cadence_type: DEFAULT_PROFILE_CADENCE.cadence_type,
-      cadence_custom_days: DEFAULT_PROFILE_CADENCE.cadence_custom_days,
-    },
-    {
+  const payload = {
+    user_id: user.id,
+    name,
+    headshot: null,
+    cadence_type: DEFAULT_PROFILE_CADENCE.cadence_type,
+    cadence_custom_days: DEFAULT_PROFILE_CADENCE.cadence_custom_days,
+  };
+  const { error } = await supabase
+    .from('realtor_profiles')
+    .upsert(payload, {
       onConflict: 'user_id',
       ignoreDuplicates: true,
-    }
-  );
+    });
   if (error) {
+    const message = error.message?.toLowerCase() ?? '';
+    if (message.includes('cadence_type') || message.includes('cadence_custom_days')) {
+      const { error: fallbackError } = await supabase
+        .from('realtor_profiles')
+        .upsert(
+          {
+            user_id: user.id,
+            name,
+            headshot: null,
+          },
+          {
+            onConflict: 'user_id',
+            ignoreDuplicates: true,
+          }
+        );
+      if (fallbackError) {
+        console.warn('Failed to initialize profile (fallback)', fallbackError);
+      }
+      return;
+    }
     console.warn('Failed to initialize profile', error);
   }
 };
@@ -233,14 +256,27 @@ export const dataService = {
     const userId = await requireSupabaseUserId(supabase, 'save profile');
     if (supabase && userId) {
       // Supabase mode.
-      const { error } = await supabase.from('realtor_profiles').upsert({
+      const payload = {
         user_id: userId,
         name: profile.name,
         headshot: profile.headshot ?? null,
         cadence_type: profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
         cadence_custom_days: profile.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
-      });
+      };
+      const { error } = await supabase.from('realtor_profiles').upsert(payload);
       if (error) {
+        const message = error.message?.toLowerCase() ?? '';
+        if (message.includes('cadence_type') || message.includes('cadence_custom_days')) {
+          const { error: fallbackError } = await supabase.from('realtor_profiles').upsert({
+            user_id: userId,
+            name: profile.name,
+            headshot: profile.headshot ?? null,
+          });
+          if (fallbackError) {
+            console.warn('Failed to save profile (fallback)', fallbackError);
+          }
+          return;
+        }
         console.warn('Failed to save profile', error);
       }
       return;
