@@ -358,6 +358,7 @@ export const dataService = {
         family_details: c.family_details,
         mortgage_inference: c.mortgage_inference,
         suggested_action: c.suggested_action,
+        tags: c.tags ?? [],
       });
       if (c.transaction_history.notes) {
         await dataService.addNote(contact.id, c.transaction_history.notes);

@@ -116,7 +116,12 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
        - 2020-2021: Assume Low Rate (<3.5%), High Equity. Tag: "HELOC / Cash-Out".
        - 2023-2024: Assume High Rate (>6.5%). Tag: "Refinance Watch".
        - 5+ Years Ago: Assume Move-up Buyer or Empty Nester.
+    5. Assign matching tags from the lists below. Only use tags that apply, otherwise return an empty array.
 
+    PRIMARY TAGS: Past Client, Friend, Family, Good Referral Source, Investor, Other
+    SECONDARY TAGS: Professional Partner, Neighbor, Sphere of Influence, Community Worker, Local Business Owner, High Trust, Low Trust, Bad Experience, Influencer/Connector, Luxury/HNW, Fitness/Health Focused, Sports Connection, Faith-Oriented, Prefers Texting, Loves to talk, Detail-oriented, Decisive, Needs Reassurance, High Energy
+
+    Each client object must include a tags array.
     Output ONLY a JSON object: { "clients": [ ... ] }
     `;
 
