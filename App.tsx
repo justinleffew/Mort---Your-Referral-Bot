@@ -924,8 +924,7 @@ const EditContact: React.FC = () => {
     // Separate local string state to prevent cursor jumping issues during input
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
-    const [interestsInput, setInterestsInput] = useState('');
-    const [interests, setInterests] = useState<string[]>([]);
+    const [aboutDraft, setAboutDraft] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const primaryTagOptions = [
         'Past Client',
@@ -956,7 +955,6 @@ const EditContact: React.FC = () => {
         'Needs Reassurance',
         'High Energy',
     ];
-    const segmentOptions = ['', 'past client', 'friend', 'referral champ', 'other'];
     const isEditing = Boolean(id);
 
     useEffect(() => {
@@ -968,27 +966,10 @@ const EditContact: React.FC = () => {
                 const nameParts = data.full_name?.trim().split(/\s+/) ?? [];
                 setFirstName(nameParts[0] ?? '');
                 setLastName(nameParts.slice(1).join(' '));
-                setInterests(data.radar_interests);
-                setInterestsInput('');
                 setSelectedTags(data.tags || []);
             }
         })();
     }, [id]);
-
-    const handleAddInterest = (value: string) => {
-        const trimmed = value.trim();
-        if (!trimmed) return;
-        if (interests.some(interest => interest.toLowerCase() === trimmed.toLowerCase())) {
-            setInterestsInput('');
-            return;
-        }
-        setInterests(current => [...current, trimmed]);
-        setInterestsInput('');
-    };
-
-    const handleRemoveInterest = (value: string) => {
-        setInterests(current => current.filter(interest => interest !== value));
-    };
 
     const handleToggleTag = (value: string) => {
         setSelectedTags(current => (
@@ -1008,14 +989,22 @@ const EditContact: React.FC = () => {
         const finalContact = {
             ...contact,
             full_name: finalName,
-            radar_interests: interests,
+            radar_interests: contact.radar_interests || [],
             tags: selectedTags
         };
-        
+
+        const trimmedAbout = aboutDraft.trim();
+
         if (isEditing && id) {
             await dataService.updateContact(id, finalContact);
+            if (trimmedAbout) {
+                await dataService.addNote(id, trimmedAbout);
+            }
         } else {
-            await dataService.addContact(finalContact);
+            const savedContact = await dataService.addContact(finalContact);
+            if (trimmedAbout) {
+                await dataService.addNote(savedContact.id, trimmedAbout);
+            }
         }
         navigate('/contacts');
     };
@@ -1077,60 +1066,22 @@ const EditContact: React.FC = () => {
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">How do you know them?</label>
-                    <select
-                        value={contact.segment || ''}
-                        onChange={e => setContact({ ...contact, segment: e.target.value })}
-                        className={InputStyle}
-                    >
-                        <option value="">Unsegmented</option>
-                        {segmentOptions.map(option => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests + Tags</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags + Notes</label>
                     <div className="rounded-2xl border border-slate-700 bg-slate-900/40 p-4 space-y-4">
                         <div>
-                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Interests</label>
+                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">About them</label>
                             <textarea
-                                value={interestsInput}
-                                onChange={e => setInterestsInput(e.target.value)}
-                                onKeyDown={event => {
-                                    if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        handleAddInterest(interestsInput);
-                                    }
-                                }}
-                                onBlur={() => handleAddInterest(interestsInput)}
-                                className={`${InputStyle} min-h-[56px] resize-none`}
-                                placeholder="Type an interest and press Enter"
+                                value={aboutDraft}
+                                onChange={e => setAboutDraft(e.target.value)}
+                                className={`${InputStyle} min-h-[96px] resize-y`}
+                                placeholder="Tell me about them like you're texting a friend. The more details the better"
                                 autoComplete="off"
                                 spellCheck={true}
                                 autoCorrect="on"
                                 autoCapitalize="sentences"
-                                rows={1}
+                                rows={3}
                             />
-                            <p className="text-xs text-slate-500 mt-2">Spell check is enabled for interest entries.</p>
                         </div>
-                        {interests.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                                {interests.map(interest => (
-                                    <span key={interest} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/60 text-xs font-bold uppercase tracking-widest text-slate-200">
-                                        {interest}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveInterest(interest)}
-                                            className="text-slate-400 hover:text-white transition-colors"
-                                            aria-label={`Remove ${interest}`}
-                                        >
-                                            ×
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
                         <div>
                             <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">Primary Tags</label>
                             <div className="flex flex-wrap gap-2">
@@ -1166,8 +1117,8 @@ const EditContact: React.FC = () => {
                                             onClick={() => handleToggleTag(tag)}
                                             className={`px-3 py-1 rounded-full border text-xs font-bold uppercase tracking-widest transition-colors ${
                                                 isSelected
-                                                    ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
-                                                    : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-emerald-400/50 hover:text-emerald-200'
+                                                    ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
+                                                    : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-amber-400/50 hover:text-amber-200'
                                             }`}
                                             aria-pressed={isSelected}
                                         >
