@@ -1719,9 +1719,15 @@ export default function App() {
     void handleAuthCallback();
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      if (data.session?.user) {
+        void dataService.initAuthProfile();
+      }
     });
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      if (nextSession?.user) {
+        void dataService.initAuthProfile();
+      }
     });
     return () => {
       authListener.subscription.unsubscribe();
