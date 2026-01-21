@@ -56,6 +56,31 @@ const parseCsvRows = (content: string) => {
   });
 };
 
+const formatPhone = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  const area = digits.slice(0, 3);
+  const middle = digits.slice(3, 6);
+  const last = digits.slice(6, 10);
+  const extra = digits.slice(10);
+
+  if (digits.length <= 3) {
+    return `(${area}`;
+  }
+  if (digits.length <= 6) {
+    return `(${area}) ${middle}`;
+  }
+  const base = `(${area}) ${middle}-${last}`;
+  return extra ? `${base} ${extra}` : base;
+};
+
+const normalizePhone = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const digits = trimmed.replace(/\D/g, '');
+  return trimmed.startsWith('+') ? `+${digits}` : digits;
+};
+
 const ImportContactsModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -694,7 +719,7 @@ const ContactDetail: React.FC = () => {
                 />
                 <DetailRow 
                     label="Phone" 
-                    value={contact.phone} 
+                    value={formatPhone(contact.phone || '')} 
                     icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>}
                 />
                 <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
@@ -1011,8 +1036,8 @@ const EditContact: React.FC = () => {
                     <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Phone</label>
                     <input 
                         type="tel" 
-                        value={contact.phone || ''} 
-                        onChange={e => setContact({...contact, phone: e.target.value})} 
+                        value={formatPhone(contact.phone || '')} 
+                        onChange={e => setContact({ ...contact, phone: normalizePhone(e.target.value) })} 
                         className={InputStyle} 
                         placeholder="(555) 000-0000"
                         autoComplete="off"
