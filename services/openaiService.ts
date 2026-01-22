@@ -5,10 +5,20 @@ type EdgeFunctionResponse<T> = {
     data?: T;
 };
 
+const AUTH_REQUIRED_MESSAGE = 'Please sign in to use Mort AI.';
+
 const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
     const supabase = getSupabaseClient();
     if (!supabase) {
         throw new Error('Supabase is not configured.');
+    }
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+        throw new Error('Unable to check authentication status.');
+    }
+    if (!sessionData?.session) {
+        throw new Error(AUTH_REQUIRED_MESSAGE);
     }
 
     const { data, error } = await supabase.functions.invoke('mort-openai', {
@@ -95,6 +105,9 @@ export const generateRadarMessage = async (
             angle
         };
     } catch (e) {
+        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
+            return { message: e.message, reason: "Authentication required", angle };
+        }
         return { message: fallbacks[angle], reason: "Error", angle };
     }
 };
@@ -129,6 +142,10 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
         const data = await callOpenAiJson<{ clients?: BrainDumpClient[] }>(prompt);
         return data.clients || [];
     } catch (e) {
+        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
+            console.warn(e.message);
+            return [];
+        }
         console.error("Failed to parse brain dump", e);
         return [];
     }
@@ -194,6 +211,9 @@ export const generateBrainDumpFollowUps = async (transcript: string): Promise<{ 
             questions
         };
     } catch (e) {
+        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
+            return { response: e.message, questions: [] };
+        }
         console.error("Failed to generate brain dump follow-ups", e);
         return buildBrainDumpFollowUpFallback(transcript);
     }
@@ -215,6 +235,9 @@ export const generateMortgageResponse = async (query: string): Promise<MortgageQ
             next_steps: json.next_steps || ''
         };
     } catch (e) {
+        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
+            return { buyer_script: e.message, ballpark_numbers: '', heads_up: '', next_steps: '' };
+        }
         console.error("Failed to generate mortgage response", e);
         return { buyer_script: "AI unavailable.", ballpark_numbers: "N/A", heads_up: "N/A", next_steps: "Check settings." };
     }
@@ -258,6 +281,9 @@ export const generateGeneralAssistResponse = async (
             response: json.response || ''
         };
     } catch (e) {
+        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
+            return { response: e.message };
+        }
         console.error("Failed to generate general assist response", e);
         return { response: "AI unavailable." };
     }
