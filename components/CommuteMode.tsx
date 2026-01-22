@@ -9,11 +9,13 @@ const CommuteMode: React.FC = () => {
     const [transcript, setTranscript] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [speechSupported, setSpeechSupported] = useState(true);
+    const [speechSynthesisSupported, setSpeechSynthesisSupported] = useState(true);
     const [speechError, setSpeechError] = useState('');
     const [showManualEntry, setShowManualEntry] = useState(false);
     const [followUpResponse, setFollowUpResponse] = useState('');
     const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
     const [isRefining, setIsRefining] = useState(false);
+    const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
     const recognitionRef = useRef<any>(null);
     const navigate = useNavigate();
 
@@ -44,6 +46,10 @@ const CommuteMode: React.FC = () => {
         recognitionRef.current.onnomatch = () => {
             setSpeechError('No speech could be recognized. Try again or use manual entry.');
         };
+    }, []);
+
+    useEffect(() => {
+        setSpeechSynthesisSupported(typeof window !== 'undefined' && 'speechSynthesis' in window);
     }, []);
 
     const toggleRecording = () => {
@@ -78,6 +84,34 @@ const CommuteMode: React.FC = () => {
 
         return () => window.clearTimeout(timeout);
     }, [transcript]);
+
+    useEffect(() => {
+        if (!speechSynthesisSupported) {
+            return;
+        }
+
+        if (!isVoiceEnabled) {
+            window.speechSynthesis.cancel();
+            return;
+        }
+
+        if (!followUpResponse.trim()) {
+            return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(followUpResponse);
+        utterance.lang = 'en-US';
+        utterance.pitch = 1.1;
+        utterance.rate = 1;
+        utterance.volume = 1;
+
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+
+        return () => {
+            window.speechSynthesis.cancel();
+        };
+    }, [followUpResponse, isVoiceEnabled, speechSynthesisSupported]);
 
     const handleProcess = async () => {
         if (!transcript) return;
@@ -145,10 +179,28 @@ const CommuteMode: React.FC = () => {
 
                 {(isRefining || followUpQuestions.length > 0 || followUpResponse) && (
                     <div className="w-full max-w-md rounded-[2rem] border border-indigo-500/30 bg-slate-950/70 px-6 py-5 text-sm text-slate-200">
-                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">
+                        <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">
                             <span>Mort Response</span>
-                            {isRefining && <span className="text-slate-500">Listening…</span>}
+                            <div className="flex items-center gap-3">
+                                {isRefining && <span className="text-slate-500">Listening…</span>}
+                                {speechSynthesisSupported ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsVoiceEnabled((prev) => !prev)}
+                                        className="rounded-full border border-indigo-400/40 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200 transition hover:border-indigo-200 hover:text-white"
+                                    >
+                                        {isVoiceEnabled ? 'Voice On' : 'Voice Muted'}
+                                    </button>
+                                ) : (
+                                    <span className="text-amber-300">Voice unavailable</span>
+                                )}
+                            </div>
                         </div>
+                        {!speechSynthesisSupported && (
+                            <div className="mt-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-xs text-amber-100">
+                                Voice playback isn’t supported in this browser. You can still read Mort’s responses here.
+                            </div>
+                        )}
                         <p className="mt-3 text-slate-300">
                             {followUpResponse || 'Tell me specific details so I can trigger real-time moments.'}
                         </p>
