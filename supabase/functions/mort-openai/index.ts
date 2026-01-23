@@ -6,6 +6,7 @@ const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 const getOpenAiKey = () =>
