@@ -62,17 +62,31 @@ create table if not exists realtor_profiles (
   cadence_custom_days integer
 );
 
+create table if not exists referral_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  source_contact_id uuid references contacts(id) on delete set null,
+  referred_name text not null,
+  stage text default 'intro',
+  status text default 'active',
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 alter table contacts enable row level security;
 alter table contact_notes enable row level security;
 alter table radar_state enable row level security;
 alter table touches enable row level security;
 alter table realtor_profiles enable row level security;
+alter table referral_events enable row level security;
 
 drop policy if exists "contacts_anon" on contacts;
 drop policy if exists "contact_notes_anon" on contact_notes;
 drop policy if exists "radar_state_anon" on radar_state;
 drop policy if exists "touches_anon" on touches;
 drop policy if exists "realtor_profiles_anon" on realtor_profiles;
+drop policy if exists "referral_events_anon" on referral_events;
 
 create policy "contacts_select_own" on contacts
   for select
@@ -175,6 +189,27 @@ create policy "realtor_profiles_update_own" on realtor_profiles
   with check (user_id = auth.uid()::text);
 
 create policy "realtor_profiles_delete_own" on realtor_profiles
+  for delete
+  to authenticated
+  using (user_id = auth.uid()::text);
+
+create policy "referral_events_select_own" on referral_events
+  for select
+  to authenticated
+  using (user_id = auth.uid()::text);
+
+create policy "referral_events_insert_own" on referral_events
+  for insert
+  to authenticated
+  with check (user_id = auth.uid()::text);
+
+create policy "referral_events_update_own" on referral_events
+  for update
+  to authenticated
+  using (user_id = auth.uid()::text)
+  with check (user_id = auth.uid()::text);
+
+create policy "referral_events_delete_own" on referral_events
   for delete
   to authenticated
   using (user_id = auth.uid()::text);
