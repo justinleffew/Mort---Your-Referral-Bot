@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { generateBrainDumpFollowUps, processBrainDump } from '../services/openaiService';
+import { generateBrainDumpFollowUps, generateSpeechAudio, processBrainDump } from '../services/openaiService';
 import { dataService } from '../services/dataService';
 
 const CommuteMode: React.FC = () => {
@@ -9,14 +9,18 @@ const CommuteMode: React.FC = () => {
     const [transcript, setTranscript] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [speechSupported, setSpeechSupported] = useState(true);
-    const [speechSynthesisSupported, setSpeechSynthesisSupported] = useState(true);
     const [speechError, setSpeechError] = useState('');
     const [showManualEntry, setShowManualEntry] = useState(false);
     const [followUpResponse, setFollowUpResponse] = useState('');
     const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
     const [isRefining, setIsRefining] = useState(false);
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+    const [selectedVoice, setSelectedVoice] = useState<'alloy' | 'nova'>('alloy');
+    const [ttsError, setTtsError] = useState('');
+    const [isTtsLoading, setIsTtsLoading] = useState(false);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const recognitionRef = useRef<any>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -46,10 +50,6 @@ const CommuteMode: React.FC = () => {
         recognitionRef.current.onnomatch = () => {
             setSpeechError('No speech could be recognized. Try again or use manual entry.');
         };
-    }, []);
-
-    useEffect(() => {
-        setSpeechSynthesisSupported(typeof window !== 'undefined' && 'speechSynthesis' in window);
     }, []);
 
     const toggleRecording = () => {
@@ -86,32 +86,71 @@ const CommuteMode: React.FC = () => {
     }, [transcript]);
 
     useEffect(() => {
-        if (!speechSynthesisSupported) {
+        if (!isVoiceEnabled) {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+            }
             return;
         }
 
-        if (!isVoiceEnabled) {
-            window.speechSynthesis.cancel();
+        if (isRecording) {
             return;
         }
 
         if (!followUpResponse.trim()) {
+            setAudioUrl(null);
             return;
         }
 
-        const utterance = new SpeechSynthesisUtterance(followUpResponse);
-        utterance.lang = 'en-US';
-        utterance.pitch = 1.1;
-        utterance.rate = 1;
-        utterance.volume = 1;
+        let cancelled = false;
+        const fetchAudio = async () => {
+            setIsTtsLoading(true);
+            setTtsError('');
+            try {
+                const { audio, mimeType } = await generateSpeechAudio(followUpResponse, selectedVoice);
+                if (cancelled) return;
+                const binary = atob(audio);
+                const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+                const blob = new Blob([bytes], { type: mimeType || 'audio/mpeg' });
+                const url = URL.createObjectURL(blob);
+                setAudioUrl(url);
+            } catch (error) {
+                if (cancelled) return;
+                console.error('Failed to generate speech audio', error);
+                setTtsError('Voice playback unavailable. Showing text only.');
+                setAudioUrl(null);
+            } finally {
+                if (!cancelled) {
+                    setIsTtsLoading(false);
+                }
+            }
+        };
 
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
+        fetchAudio();
 
         return () => {
-            window.speechSynthesis.cancel();
+            cancelled = true;
         };
-    }, [followUpResponse, isVoiceEnabled, speechSynthesisSupported]);
+    }, [followUpResponse, isVoiceEnabled, selectedVoice, isRecording]);
+
+    useEffect(() => {
+        if (!audioUrl) {
+            return;
+        }
+
+        if (audioRef.current) {
+            audioRef.current.src = audioUrl;
+            audioRef.current.play().catch((error) => {
+                console.error('Audio playback failed', error);
+                setTtsError('Audio playback was blocked. Showing text only.');
+            });
+        }
+
+        return () => {
+            URL.revokeObjectURL(audioUrl);
+        };
+    }, [audioUrl]);
 
     const handleProcess = async () => {
         if (!transcript) return;
@@ -183,24 +222,33 @@ const CommuteMode: React.FC = () => {
                             <span>Mort Response</span>
                             <div className="flex items-center gap-3">
                                 {isRefining && <span className="text-slate-500">Listening…</span>}
-                                {speechSynthesisSupported ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsVoiceEnabled((prev) => !prev)}
-                                        className="rounded-full border border-indigo-400/40 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200 transition hover:border-indigo-200 hover:text-white"
+                                {isTtsLoading && <span className="text-slate-500">Generating audio…</span>}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsVoiceEnabled((prev) => !prev)}
+                                    className="rounded-full border border-indigo-400/40 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200 transition hover:border-indigo-200 hover:text-white"
+                                >
+                                    {isVoiceEnabled ? 'Voice On' : 'Voice Muted'}
+                                </button>
+                                <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">
+                                    Voice
+                                    <select
+                                        value={selectedVoice}
+                                        onChange={(event) => setSelectedVoice(event.target.value as 'alloy' | 'nova')}
+                                        className="rounded-full border border-indigo-400/40 bg-slate-950/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200"
                                     >
-                                        {isVoiceEnabled ? 'Voice On' : 'Voice Muted'}
-                                    </button>
-                                ) : (
-                                    <span className="text-amber-300">Voice unavailable</span>
-                                )}
+                                        <option value="alloy">Alloy</option>
+                                        <option value="nova">Nova</option>
+                                    </select>
+                                </label>
                             </div>
                         </div>
-                        {!speechSynthesisSupported && (
+                        {ttsError && (
                             <div className="mt-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-xs text-amber-100">
-                                Voice playback isn’t supported in this browser. You can still read Mort’s responses here.
+                                {ttsError}
                             </div>
                         )}
+                        <audio ref={audioRef} className="hidden" />
                         <p className="mt-3 text-slate-300">
                             {followUpResponse || 'Tell me specific details so I can trigger real-time moments.'}
                         </p>
