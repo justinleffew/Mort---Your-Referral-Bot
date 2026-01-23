@@ -147,7 +147,7 @@ const CommuteMode: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-950 z-[100] flex flex-col p-8 items-center justify-between animate-in fade-in duration-500">
+        <div className="min-h-screen bg-slate-950 z-[100] flex flex-col p-8 items-center justify-between animate-in fade-in duration-500 overflow-y-auto">
             {/* Header */}
             <div className="w-full flex justify-between items-center pt-4">
                 <button onClick={() => navigate('/')} className="text-slate-500 font-black uppercase text-xs tracking-widest border border-white/5 px-6 py-3 rounded-full">
