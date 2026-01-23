@@ -195,13 +195,56 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
 };
 
 const buildBrainDumpFollowUpFallback = (transcript: string) => {
-    const nameMatch = transcript.match(/\bnamed\s+([A-Z][a-z]+)|\bname(?:d)?\s+([A-Z][a-z]+)/i);
-    const possibleName = nameMatch?.[1] || nameMatch?.[2] || '';
-    const name = possibleName ? possibleName.trim() : '';
+    const lastNameMatch = transcript.match(/\b(?:his|her|their)?\s*(?:last name|surname)\s+(?:is|was)\s+([A-Z][a-z]+)\b/i);
+    const lastName = lastNameMatch?.[1]?.trim() ?? '';
+    const nameMatch = transcript.match(/\b(?:name|named)\s+(?:(?:is|was)\s+)?([A-Z][a-z]+)\b/i);
+    const possibleName = nameMatch?.[1] || '';
+    const name = ['is', 'was'].includes(possibleName.toLowerCase()) ? '' : possibleName.trim();
     const sportMatch = transcript.match(/\b(football|soccer|basketball|baseball|hockey|tennis|golf)\b/i);
     const sport = sportMatch ? sportMatch[1].toLowerCase() : '';
+    const hasName = !!name;
+    const hasLastName = !!lastName;
+    const hasSport = !!sport;
 
-    if (name && sport) {
+    if (hasLastName) {
+        if (!hasName && hasSport) {
+            return {
+                response: `Got it — what is their first name and do they have a favorite ${sport} team? More information now means better touchpoints and more referrals for you!`,
+                questions: [
+                    "What is their first name?",
+                    `Do they have a favorite ${sport} team?`
+                ]
+            };
+        }
+
+        if (!hasName) {
+            return {
+                response: "Got it — what is their first name and any favorite interests or milestones to remember? More information now means better touchpoints and more referrals for you!",
+                questions: [
+                    "What is their first name?",
+                    "Any favorite interests, teams, or milestones to note?"
+                ]
+            };
+        }
+
+        if (hasSport) {
+            return {
+                response: `Got it — do they have a favorite ${sport} team? More information now means better touchpoints and more referrals for you!`,
+                questions: [
+                    `Do they have a favorite ${sport} team?`
+                ]
+            };
+        }
+
+        return {
+            response: "Got it — any favorite interests or milestones to remember? More information now means better touchpoints and more referrals for you!",
+            questions: [
+                "Any favorite interests, teams, or milestones to note?"
+            ]
+        };
+    }
+
+    if (hasName && hasSport) {
         return {
             response: `Got it — what is ${name}'s last name and do they have a favorite ${sport} team? More information now means better touchpoints and more referrals for you!`,
             questions: [
@@ -211,12 +254,12 @@ const buildBrainDumpFollowUpFallback = (transcript: string) => {
         };
     }
 
-    if (name) {
+    if (hasName) {
         return {
             response: `Got it — what is ${name}'s last name and any favorite interests or milestones to remember? More information now means better touchpoints and more referrals for you!`,
             questions: [
                 `What is ${name}'s last name?`,
-                `Any favorite interests, teams, or milestones to note?`
+                "Any favorite interests, teams, or milestones to note?"
             ]
         };
     }
