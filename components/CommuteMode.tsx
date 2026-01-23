@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { generateBrainDumpFollowUps, generateSpeechAudio, processBrainDump } from '../services/openaiService';
+import { AUTH_REQUIRED_MESSAGE, generateBrainDumpFollowUps, generateSpeechAudio, processBrainDump } from '../services/openaiService';
 import { dataService } from '../services/dataService';
+import { getSupabaseClient } from '../services/supabaseClient';
 
 const CommuteMode: React.FC = () => {
     const [isRecording, setIsRecording] = useState(false);
@@ -19,6 +20,7 @@ const CommuteMode: React.FC = () => {
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
     const [selectedVoice, setSelectedVoice] = useState<'alloy' | 'nova'>('alloy');
     const [ttsError, setTtsError] = useState('');
+    const [voiceAuthMessage, setVoiceAuthMessage] = useState('');
     const [isTtsLoading, setIsTtsLoading] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const recognitionRef = useRef<any>(null);
@@ -117,6 +119,36 @@ const CommuteMode: React.FC = () => {
     }, [conversationTranscript]);
 
     useEffect(() => {
+        let active = true;
+        const checkVoiceAuth = async () => {
+            const supabase = getSupabaseClient();
+            if (!supabase) {
+                if (active) {
+                    setIsVoiceEnabled(false);
+                    setVoiceAuthMessage('Sign in to enable voice playback.');
+                }
+                return;
+            }
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+            if (!active) {
+                return;
+            }
+            if (sessionError || !sessionData?.session) {
+                setIsVoiceEnabled(false);
+                setVoiceAuthMessage(`${AUTH_REQUIRED_MESSAGE} Sign in to enable voice playback.`);
+                return;
+            }
+            setVoiceAuthMessage('');
+        };
+
+        checkVoiceAuth();
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    useEffect(() => {
         if (!isVoiceEnabled) {
             if (audioRef.current) {
                 audioRef.current.pause();
@@ -139,6 +171,21 @@ const CommuteMode: React.FC = () => {
             setIsTtsLoading(true);
             setTtsError('');
             try {
+                const supabase = getSupabaseClient();
+                if (!supabase) {
+                    setIsVoiceEnabled(false);
+                    setVoiceAuthMessage('Sign in to enable voice playback.');
+                    setAudioUrl(null);
+                    return;
+                }
+                const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError || !sessionData?.session) {
+                    setIsVoiceEnabled(false);
+                    setVoiceAuthMessage(`${AUTH_REQUIRED_MESSAGE} Sign in to enable voice playback.`);
+                    setAudioUrl(null);
+                    return;
+                }
+                setVoiceAuthMessage('');
                 const { audio, mimeType } = await generateSpeechAudio(followUpResponse, selectedVoice);
                 if (cancelled) return;
                 const binary = atob(audio);
@@ -271,7 +318,8 @@ const CommuteMode: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setIsVoiceEnabled((prev) => !prev)}
-                                    className="rounded-full border border-indigo-400/40 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200 transition hover:border-indigo-200 hover:text-white"
+                                    disabled={!!voiceAuthMessage}
+                                    className={`rounded-full border border-indigo-400/40 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200 transition hover:border-indigo-200 hover:text-white ${voiceAuthMessage ? 'cursor-not-allowed opacity-60' : ''}`}
                                 >
                                     {isVoiceEnabled ? 'Voice On' : 'Voice Muted'}
                                 </button>
@@ -280,7 +328,8 @@ const CommuteMode: React.FC = () => {
                                     <select
                                         value={selectedVoice}
                                         onChange={(event) => setSelectedVoice(event.target.value as 'alloy' | 'nova')}
-                                        className="rounded-full border border-indigo-400/40 bg-slate-950/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200"
+                                        disabled={!!voiceAuthMessage}
+                                        className={`rounded-full border border-indigo-400/40 bg-slate-950/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200 ${voiceAuthMessage ? 'cursor-not-allowed opacity-60' : ''}`}
                                     >
                                         <option value="alloy">Alloy</option>
                                         <option value="nova">Nova</option>
@@ -288,6 +337,11 @@ const CommuteMode: React.FC = () => {
                                 </label>
                             </div>
                         </div>
+                        {voiceAuthMessage && (
+                            <div className="mt-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-xs text-amber-100">
+                                {voiceAuthMessage}
+                            </div>
+                        )}
                         {ttsError && (
                             <div className="mt-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-xs text-amber-100">
                                 {ttsError}
