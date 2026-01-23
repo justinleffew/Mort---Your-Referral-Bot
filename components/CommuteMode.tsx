@@ -7,7 +7,8 @@ import { dataService } from '../services/dataService';
 const CommuteMode: React.FC = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [transcript, setTranscript] = useState('');
-    const [finalTranscript, setFinalTranscript] = useState('');
+    const [conversationTranscript, setConversationTranscript] = useState('');
+    const [lastFinalizedSnippet, setLastFinalizedSnippet] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [speechSupported, setSpeechSupported] = useState(true);
     const [speechError, setSpeechError] = useState('');
@@ -54,6 +55,15 @@ const CommuteMode: React.FC = () => {
         };
     }, []);
 
+    const appendToConversation = (newTranscript: string) => {
+        const trimmedTranscript = newTranscript.trim();
+        if (!trimmedTranscript) {
+            return;
+        }
+        setConversationTranscript((prev) => (prev ? `${prev}\n${trimmedTranscript}` : trimmedTranscript));
+        setLastFinalizedSnippet(trimmedTranscript);
+    };
+
     const toggleRecording = () => {
         if (!speechSupported) {
             return;
@@ -61,13 +71,17 @@ const CommuteMode: React.FC = () => {
         if (isRecording) {
             recognitionRef.current?.stop();
             setIsRecording(false);
-            setFinalTranscript(transcript.trim());
+            appendToConversation(transcript.trim());
         } else {
+            const isFollowUpCycle = conversationTranscript.trim().length > 0 && (followUpQuestions.length > 0 || followUpResponse || isRefining);
             setTranscript('');
-            setFinalTranscript('');
-            setFollowUpResponse('');
-            setFollowUpQuestions([]);
-            setIsRefining(false);
+            if (!isFollowUpCycle) {
+                setConversationTranscript('');
+                setLastFinalizedSnippet('');
+                setFollowUpResponse('');
+                setFollowUpQuestions([]);
+                setIsRefining(false);
+            }
             setSpeechError('');
             if (followUpTimeoutRef.current !== null) {
                 window.clearTimeout(followUpTimeoutRef.current);
@@ -79,7 +93,7 @@ const CommuteMode: React.FC = () => {
     };
 
     useEffect(() => {
-        if (!finalTranscript.trim()) {
+        if (!conversationTranscript.trim()) {
             setFollowUpResponse('');
             setFollowUpQuestions([]);
             return;
@@ -87,7 +101,7 @@ const CommuteMode: React.FC = () => {
 
         const timeout = window.setTimeout(async () => {
             setIsRefining(true);
-            const followUp = await generateBrainDumpFollowUps(finalTranscript);
+            const followUp = await generateBrainDumpFollowUps(conversationTranscript);
             setFollowUpResponse(followUp.response);
             setFollowUpQuestions(followUp.questions);
             setIsRefining(false);
@@ -100,7 +114,7 @@ const CommuteMode: React.FC = () => {
                 followUpTimeoutRef.current = null;
             }
         };
-    }, [finalTranscript]);
+    }, [conversationTranscript]);
 
     useEffect(() => {
         if (!isVoiceEnabled) {
@@ -170,9 +184,10 @@ const CommuteMode: React.FC = () => {
     }, [audioUrl]);
 
     const handleProcess = async () => {
-        if (!transcript) return;
+        const combinedTranscript = conversationTranscript.trim() || transcript.trim();
+        if (!combinedTranscript) return;
         setIsProcessing(true);
-        const clients = await processBrainDump(transcript);
+        const clients = await processBrainDump(combinedTranscript);
         await dataService.addBrainDumpClients(clients);
         setIsProcessing(false);
         navigate('/');
@@ -182,7 +197,10 @@ const CommuteMode: React.FC = () => {
         if (!transcript.trim()) {
             return;
         }
-        setFinalTranscript(transcript.trim());
+        if (transcript.trim() === lastFinalizedSnippet) {
+            return;
+        }
+        appendToConversation(transcript.trim());
     };
 
     return (
@@ -245,7 +263,10 @@ const CommuteMode: React.FC = () => {
                         <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">
                             <span>Mort Response</span>
                             <div className="flex items-center gap-3">
-                                {isRefining && <span className="text-slate-500">Listening…</span>}
+                                {isRecording && conversationTranscript.trim() && (
+                                    <span className="text-slate-500">Listening for follow-up answers…</span>
+                                )}
+                                {!isRecording && isRefining && <span className="text-slate-500">Listening…</span>}
                                 {isTtsLoading && <span className="text-slate-500">Generating audio…</span>}
                                 <button
                                     type="button"
