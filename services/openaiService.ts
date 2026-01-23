@@ -37,6 +37,49 @@ const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
     return payload.data;
 };
 
+export type OpenAiTtsResponse = {
+    audio: string;
+    mimeType: string;
+};
+
+export const generateSpeechAudio = async (text: string, voice: string): Promise<OpenAiTtsResponse> => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+        throw new Error('Text is required for speech synthesis.');
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+        throw new Error('Supabase is not configured.');
+    }
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+        throw new Error('Unable to check authentication status.');
+    }
+    if (!sessionData?.session) {
+        throw new Error(AUTH_REQUIRED_MESSAGE);
+    }
+
+    const { data, error } = await supabase.functions.invoke('mort-openai-tts', {
+        body: {
+            text: trimmed,
+            voice
+        }
+    });
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    const payload = data as EdgeFunctionResponse<OpenAiTtsResponse> | null;
+    if (!payload?.data?.audio) {
+        throw new Error('Invalid speech response.');
+    }
+
+    return payload.data;
+};
+
 export const determineAngle = (contact: Contact, notes: ContactNote[], usedAngles: string[]): RadarAngle => {
     const hasInterests = contact.radar_interests.length > 0;
     const hasMortgageOpp = !!contact.mortgage_inference;
