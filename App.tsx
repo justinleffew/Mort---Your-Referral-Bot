@@ -9,7 +9,18 @@ import AuthPanel from './components/AuthPanel';
 import { dataService } from './services/dataService';
 import { getSupabaseClient } from './services/supabaseClient';
 import { formatShortDate, getNextTouchDate, getNextTouchStatus } from './utils/cadence';
-import { Contact, ContactNote, Opportunity, RadarState, RealtorProfile, Touch, TouchType } from './types';
+import {
+  Contact,
+  ContactNote,
+  Opportunity,
+  RadarState,
+  RealtorProfile,
+  ReferralEvent,
+  ReferralStage,
+  ReferralStatus,
+  Touch,
+  TouchType,
+} from './types';
 
 const DEFAULT_CADENCE_DAYS = 90;
 const DEFAULT_PROFILE: RealtorProfile = {
@@ -79,6 +90,74 @@ const normalizePhone = (value: string) => {
   if (!trimmed) return '';
   const digits = trimmed.replace(/\D/g, '');
   return trimmed.startsWith('+') ? `+${digits}` : digits;
+};
+
+const PLAYBOOKS = [
+  {
+    id: 'anniversary',
+    title: 'Home anniversary check-in',
+    body: 'Hey [Name], just realized it’s been about a year since you moved in. How’s everything settling in? Happy to help with anything you need.',
+  },
+  {
+    id: 'referral-thanks',
+    title: 'Referral thank-you',
+    body: 'Thanks again for connecting me with [Referral Name]. I appreciate you, and I’ll take great care of them.',
+  },
+  {
+    id: 'market-update',
+    title: 'Soft market update',
+    body: 'Hey [Name], quick note — I’m seeing some interesting shifts in [Area]. If you ever want a quick snapshot for your home, I’m happy to help.',
+  },
+  {
+    id: 'check-in',
+    title: 'Light touch check-in',
+    body: 'Hi [Name], you popped into my head today. Hope you’re doing great. Happy to help if you need anything.',
+  },
+];
+
+const PlaybookPanel: React.FC = () => {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCopy = async (content: string, id: string) => {
+    setError(null);
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      setError('Copy failed. Select the text and copy manually.');
+    }
+  };
+
+  return (
+    <div className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">Playbooks</p>
+          <h3 className="text-xl font-black text-white uppercase tracking-tighter">Copy-ready scripts</h3>
+        </div>
+      </div>
+      <div className="grid gap-4">
+        {PLAYBOOKS.map(playbook => (
+          <div key={playbook.id} className="bg-slate-950/70 border border-white/5 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-black uppercase tracking-widest text-indigo-300">{playbook.title}</p>
+              <button
+                type="button"
+                onClick={() => handleCopy(playbook.body, playbook.id)}
+                className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300 hover:text-emerald-200 transition"
+              >
+                {copiedId === playbook.id ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <p className="text-sm text-slate-200 whitespace-pre-line">{playbook.body}</p>
+          </div>
+        ))}
+      </div>
+      {error && <p className="mt-3 text-xs font-semibold text-amber-400">{error}</p>}
+    </div>
+  );
 };
 
 const ImportContactsModal: React.FC<{
@@ -499,6 +578,10 @@ const Dashboard: React.FC = () => {
           })}
         </div>
       )}
+
+      <div className="mb-10">
+        <PlaybookPanel />
+      </div>
       
       {radarItems.length === 0 ? (
         <div className="text-center py-16 px-6">
@@ -569,6 +652,133 @@ const Dashboard: React.FC = () => {
   );
 };
 
+const DailyActions: React.FC = () => {
+  const [radarContacts, setRadarContacts] = useState<Contact[]>([]);
+  const [referralEvents, setReferralEvents] = useState<ReferralEvent[]>([]);
+  const [topSources, setTopSources] = useState<
+    Array<{ contact: Contact; total: number; won: number; active: number; score: number }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [eligibleContacts, referrals, contacts] = await Promise.all([
+        dataService.getEligibleContacts(),
+        dataService.getReferralEvents(),
+        dataService.getContacts(),
+      ]);
+
+      const scoredSources = await Promise.all(
+        contacts.map(async contact => {
+          const score = await dataService.getReferralSourceScore(contact.id);
+          return { contact, ...score };
+        })
+      );
+
+      setRadarContacts(eligibleContacts.slice(0, 6));
+      setReferralEvents(referrals.filter(event => event.status === 'active').slice(0, 6));
+      setTopSources(
+        scoredSources
+          .filter(source => source.total > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 6)
+      );
+      setLoading(false);
+    };
+    void load();
+  }, []);
+
+  const stageLabel = (stage: ReferralStage) =>
+    stage
+      .split('_')
+      .map(word => word[0]?.toUpperCase() + word.slice(1))
+      .join(' ');
+
+  if (loading) {
+    return (
+      <div className="p-8 text-slate-400 font-semibold">Loading daily actions...</div>
+    );
+  }
+
+  return (
+    <div className="px-6 pb-24 space-y-8">
+      <header className="pt-8">
+        <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">Daily Actions</p>
+        <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Focus list</h1>
+        <p className="text-sm text-slate-400 mt-2">High-value touches and referrals to move today.</p>
+      </header>
+
+      <section className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl space-y-4">
+        <h2 className="text-lg font-black text-white uppercase tracking-widest">Radar follow-ups</h2>
+        {radarContacts.length === 0 ? (
+          <p className="text-sm text-slate-500">No radar follow-ups due right now.</p>
+        ) : (
+          <ul className="space-y-3">
+            {radarContacts.map(contact => (
+              <li key={contact.id} className="flex items-center justify-between bg-slate-950/60 border border-white/5 rounded-2xl px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-white">{contact.full_name}</p>
+                  <p className="text-xs text-slate-400">{contact.radar_interests[0] || 'No interest noted'}</p>
+                </div>
+                <button
+                  type="button"
+                  className="text-xs font-black uppercase tracking-[0.2em] text-indigo-300"
+                  onClick={() => {
+                    window.location.hash = `#/contacts/${contact.id}`;
+                  }}
+                >
+                  View
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl space-y-4">
+        <h2 className="text-lg font-black text-white uppercase tracking-widest">Active referrals</h2>
+        {referralEvents.length === 0 ? (
+          <p className="text-sm text-slate-500">No active referrals yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {referralEvents.map(event => (
+              <li key={event.id} className="bg-slate-950/60 border border-white/5 rounded-2xl px-4 py-3 space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-white">{event.referred_name}</p>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">
+                    {stageLabel(event.stage)}
+                  </span>
+                </div>
+                {event.notes && <p className="text-xs text-slate-400">{event.notes}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl space-y-4">
+        <h2 className="text-lg font-black text-white uppercase tracking-widest">Top referral sources</h2>
+        {topSources.length === 0 ? (
+          <p className="text-sm text-slate-500">No referral sources scored yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {topSources.map(source => (
+              <li key={source.contact.id} className="flex items-center justify-between bg-slate-950/60 border border-white/5 rounded-2xl px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-white">{source.contact.full_name}</p>
+                  <p className="text-xs text-slate-400">{source.won} won · {source.active} active</p>
+                </div>
+                <span className="text-sm font-black text-indigo-300">Score {source.score}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+};
+
 const ContactDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -581,6 +791,11 @@ const ContactDetail: React.FC = () => {
         quarterCount: 0,
         lastTouch: null
     });
+    const [referralEvents, setReferralEvents] = useState<ReferralEvent[]>([]);
+    const [referralScore, setReferralScore] = useState({ total: 0, won: 0, active: 0, score: 0 });
+    const [referralName, setReferralName] = useState('');
+    const [referralStage, setReferralStage] = useState<ReferralStage>('intro');
+    const [referralNotes, setReferralNotes] = useState('');
     const [profileCadenceDays, setProfileCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
     const [cadenceSelection, setCadenceSelection] = useState<number>(DEFAULT_CADENCE_DAYS);
     const [customCadence, setCustomCadence] = useState<string>('');
@@ -653,14 +868,18 @@ const ContactDetail: React.FC = () => {
     };
 
     const refreshActivity = async (contactId: string) => {
-        const [contactTouches, contactNotes, summary] = await Promise.all([
+        const [contactTouches, contactNotes, summary, referrals, score] = await Promise.all([
             dataService.getTouches(contactId),
             dataService.getNotes(contactId),
             dataService.getTouchSummary(contactId),
+            dataService.getReferralEventsBySource(contactId),
+            dataService.getReferralSourceScore(contactId),
         ]);
         setTouches(contactTouches);
         setNotes(contactNotes);
         setTouchSummary({ ...summary, lastTouch: summary.lastTouch || null });
+        setReferralEvents(referrals);
+        setReferralScore(score);
     };
 
     const handleAddNote = async () => {
@@ -668,6 +887,26 @@ const ContactDetail: React.FC = () => {
         if (!trimmed) return;
         await dataService.addNote(contact.id, trimmed);
         setNoteDraft('');
+        await refreshActivity(contact.id);
+    };
+
+    const handleAddReferral = async () => {
+        const trimmedName = referralName.trim();
+        if (!trimmedName) return;
+        await dataService.addReferralEvent({
+            sourceContactId: contact.id,
+            referredName: trimmedName,
+            stage: referralStage,
+            notes: referralNotes.trim() || undefined,
+        });
+        setReferralName('');
+        setReferralStage('intro');
+        setReferralNotes('');
+        await refreshActivity(contact.id);
+    };
+
+    const handleUpdateReferral = async (eventId: string, updates: Partial<ReferralEvent>) => {
+        await dataService.updateReferralEvent(eventId, updates);
         await refreshActivity(contact.id);
     };
 
@@ -849,6 +1088,107 @@ const ContactDetail: React.FC = () => {
                                 className="h-4 w-4 accent-rose-500"
                             />
                         </label>
+                    </div>
+                </div>
+                <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Referral Pipeline</p>
+                        <span className="text-xs font-black uppercase tracking-widest text-emerald-400">
+                            Score {referralScore.score}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Total</p>
+                            <p className="text-xl font-black text-white">{referralScore.total}</p>
+                        </div>
+                        <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Active</p>
+                            <p className="text-xl font-black text-white">{referralScore.active}</p>
+                        </div>
+                        <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-3">
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Won</p>
+                            <p className="text-xl font-black text-white">{referralScore.won}</p>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        <input
+                            type="text"
+                            value={referralName}
+                            onChange={event => setReferralName(event.target.value)}
+                            placeholder="Referred client name"
+                            className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-white"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                            <select
+                                value={referralStage}
+                                onChange={event => setReferralStage(event.target.value as ReferralStage)}
+                                className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                            >
+                                {(['intro', 'engaged', 'showing', 'under_contract', 'closed', 'lost'] as ReferralStage[]).map(stage => (
+                                    <option key={stage} value={stage}>
+                                        {stage.replace('_', ' ')}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleAddReferral}
+                                className="w-full bg-emerald-500/20 text-emerald-200 text-xs font-black uppercase tracking-widest rounded-xl border border-emerald-500/40"
+                            >
+                                Add Referral
+                            </button>
+                        </div>
+                        <textarea
+                            value={referralNotes}
+                            onChange={event => setReferralNotes(event.target.value)}
+                            placeholder="Notes (optional)"
+                            className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-white min-h-[80px]"
+                        />
+                    </div>
+                    <div className="space-y-3">
+                        {referralEvents.length === 0 ? (
+                            <p className="text-xs text-slate-600 italic">No referrals tracked yet.</p>
+                        ) : (
+                            referralEvents.map(event => (
+                                <div key={event.id} className="bg-slate-900/60 border border-white/5 rounded-2xl p-4 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-bold text-white">{event.referred_name}</p>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                                            {event.status}
+                                        </span>
+                                    </div>
+                                    {event.notes && <p className="text-xs text-slate-400">{event.notes}</p>}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <select
+                                            value={event.stage}
+                                            onChange={eventChange =>
+                                                handleUpdateReferral(event.id, { stage: eventChange.target.value as ReferralStage })
+                                            }
+                                            className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                                        >
+                                            {(['intro', 'engaged', 'showing', 'under_contract', 'closed', 'lost'] as ReferralStage[]).map(stage => (
+                                                <option key={stage} value={stage}>
+                                                    {stage.replace('_', ' ')}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={event.status}
+                                            onChange={eventChange =>
+                                                handleUpdateReferral(event.id, { status: eventChange.target.value as ReferralStatus })
+                                            }
+                                            className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                                        >
+                                            {(['active', 'won', 'lost'] as ReferralStatus[]).map(status => (
+                                                <option key={status} value={status}>
+                                                    {status}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
                 <div className="p-6 bg-slate-800/20 border border-white/5 rounded-3xl space-y-4">
@@ -1624,6 +1964,7 @@ const BottomNav: React.FC = () => {
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-slate-950/90 backdrop-blur-2xl border-t border-white/5 px-8 py-4 flex justify-between items-center max-w-2xl mx-auto rounded-t-[3rem] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
             <Link to="/" className={navItemClass('/')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 9.5V21h5v-6h5v6h5V9.5L12 2z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Radar</span></Link>
+            <Link to="/actions" className={navItemClass('/actions')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12h3l3 8 4-16 3 8h5" /></svg><span className="text-xs font-black uppercase tracking-tighter">Actions</span></Link>
             <Link to="/mort" className={navItemClass('/mort')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Mort</span></Link>
             <Link to="/contacts" className={navItemClass('/contacts')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Contacts</span></Link>
             <Link to="/tools" className={navItemClass('/tools')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Calc</span></Link>
@@ -1753,6 +2094,7 @@ export default function App() {
             </div>
             <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/actions" element={<DailyActions />} />
                 <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
                 <Route path="/commute" element={<CommuteMode />} />
                 <Route path="/contacts" element={<ContactsList />} />

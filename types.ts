@@ -123,6 +123,22 @@ export interface GeneratedMessage {
   angle: RadarAngle;
 }
 
+export type ReferralStage = 'intro' | 'engaged' | 'showing' | 'under_contract' | 'closed' | 'lost';
+
+export type ReferralStatus = 'active' | 'won' | 'lost';
+
+export interface ReferralEvent {
+  id: string;
+  user_id: string;
+  source_contact_id: string | null;
+  referred_name: string;
+  stage: ReferralStage;
+  status: ReferralStatus;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BrainDumpClient {
   names: string[];
   location_context: string;

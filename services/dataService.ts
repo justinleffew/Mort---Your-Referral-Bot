@@ -1,4 +1,16 @@
-import { BrainDumpClient, Contact, ContactNote, Opportunity, RadarState, RealtorProfile, Touch, TouchType } from '../types';
+import {
+  BrainDumpClient,
+  Contact,
+  ContactNote,
+  Opportunity,
+  RadarState,
+  RealtorProfile,
+  ReferralEvent,
+  ReferralStage,
+  ReferralStatus,
+  Touch,
+  TouchType,
+} from '../types';
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
 
 const STORAGE_KEYS = {
@@ -7,6 +19,7 @@ const STORAGE_KEYS = {
   RADAR: 'mort_radar_state',
   PROFILE: 'mort_realtor_profile',
   TOUCHES: 'mort_touches',
+  REFERRALS: 'mort_referral_events',
   AGENT_ID: 'mort_agent_id',
   SAMPLE_SEEDED: 'mort_sample_seeded',
 };
@@ -209,6 +222,13 @@ const defaultRadarState = (contactId: string, userId: string): RadarState => ({
   reached_out: false,
   angles_used_json: [],
   last_refreshed_at: new Date().toISOString(),
+});
+
+const normalizeReferralEvent = (event: ReferralEvent): ReferralEvent => ({
+  ...event,
+  stage: event.stage ?? 'intro',
+  status: event.status ?? 'active',
+  notes: event.notes ?? '',
 });
 
 export const dataService = {
@@ -669,6 +689,123 @@ export const dataService = {
     touches.push(touch);
     save(STORAGE_KEYS.TOUCHES, touches);
     await dataService.updateContact(contactId, { last_contacted_at: touch.created_at });
+  },
+
+  getReferralEvents: async (): Promise<ReferralEvent[]> => {
+    const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      const { data, error } = await supabase
+        .from('referral_events')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Failed to load referral events', error);
+        return [];
+      }
+      return (data || []).map(normalizeReferralEvent);
+    }
+
+    return load<ReferralEvent>(STORAGE_KEYS.REFERRALS).map(normalizeReferralEvent);
+  },
+
+  addReferralEvent: async (data: {
+    sourceContactId?: string | null;
+    referredName: string;
+    stage?: ReferralStage;
+    status?: ReferralStatus;
+    notes?: string;
+  }): Promise<ReferralEvent> => {
+    const supabase = getSupabaseClient();
+    const userId = await requireSupabaseUserId(supabase, 'add referral event');
+    const now = new Date().toISOString();
+    const buildReferral = (ownerId: string): ReferralEvent =>
+      normalizeReferralEvent({
+        id: uuid(),
+        user_id: ownerId,
+        source_contact_id: data.sourceContactId ?? null,
+        referred_name: data.referredName.trim() || 'Unknown',
+        stage: data.stage ?? 'intro',
+        status: data.status ?? 'active',
+        notes: data.notes?.trim(),
+        created_at: now,
+        updated_at: now,
+      });
+
+    if (supabase && userId) {
+      const referral = buildReferral(userId);
+      const { data: inserted, error } = await supabase
+        .from('referral_events')
+        .insert(referral)
+        .select()
+        .single();
+      if (error) {
+        console.warn('Failed to add referral event', error);
+        return referral;
+      }
+      return normalizeReferralEvent(inserted);
+    }
+
+    const agentId = getAgentId();
+    const referral = buildReferral(agentId);
+    const events = load<ReferralEvent>(STORAGE_KEYS.REFERRALS);
+    events.push(referral);
+    save(STORAGE_KEYS.REFERRALS, events);
+    return referral;
+  },
+
+  updateReferralEvent: async (id: string, updates: Partial<ReferralEvent>) => {
+    const supabase = getSupabaseClient();
+    const userId = await requireSupabaseUserId(supabase, 'update referral event');
+    const payload = { ...updates, updated_at: new Date().toISOString() };
+
+    if (supabase && userId) {
+      const { error } = await supabase
+        .from('referral_events')
+        .update({ ...payload, user_id: userId })
+        .eq('id', id)
+        .eq('user_id', userId);
+      if (error) {
+        console.warn('Failed to update referral event', error);
+      }
+      return;
+    }
+
+    const events = load<ReferralEvent>(STORAGE_KEYS.REFERRALS);
+    const index = events.findIndex(event => event.id === id);
+    if (index !== -1) {
+      events[index] = normalizeReferralEvent({ ...events[index], ...payload });
+      save(STORAGE_KEYS.REFERRALS, events);
+    }
+  },
+
+  getReferralEventsBySource: async (contactId: string) => {
+    const events = await dataService.getReferralEvents();
+    return events.filter(event => event.source_contact_id === contactId);
+  },
+
+  getReferralSourceScore: async (contactId: string) => {
+    const events = await dataService.getReferralEventsBySource(contactId);
+    const scoreByStage: Record<ReferralStage, number> = {
+      intro: 1,
+      engaged: 2,
+      showing: 3,
+      under_contract: 4,
+      closed: 5,
+      lost: 0,
+    };
+    const totals = events.reduce(
+      (acc, event) => {
+        acc.total += 1;
+        if (event.status === 'won' || event.stage === 'closed') acc.won += 1;
+        if (event.status === 'active') acc.active += 1;
+        acc.score += scoreByStage[event.stage] ?? 0;
+        return acc;
+      },
+      { total: 0, won: 0, active: 0, score: 0 }
+    );
+    return totals;
   },
 
   getTouchSummary: async (contactId: string) => {
