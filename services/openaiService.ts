@@ -5,7 +5,7 @@ type EdgeFunctionResponse<T> = {
     data?: T;
 };
 
-const AUTH_REQUIRED_MESSAGE = 'Please sign in to use Mort AI.';
+export const AUTH_REQUIRED_MESSAGE = 'Please sign in to use Mort AI.';
 
 const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
     const supabase = getSupabaseClient();
