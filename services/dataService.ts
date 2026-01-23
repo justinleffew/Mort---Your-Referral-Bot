@@ -110,17 +110,6 @@ const withProfileDefaults = (profile?: RealtorProfile | null): RealtorProfile =>
     profile?.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
 });
 
-const getAuthUser = async () => {
-  const supabase = getSupabaseClient();
-  if (!supabase) return null;
-  const { data, error } = await supabase.auth.getUser();
-  if (error) {
-    console.warn('Failed to load auth user', error);
-    return null;
-  }
-  return data.user ?? null;
-};
-
 const upsertProfileForUser = async (
   user: { id: string; user_metadata?: Record<string, any> },
   nameOverride?: string
@@ -164,12 +153,6 @@ const upsertProfileForUser = async (
     }
     console.warn('Failed to initialize profile', error);
   }
-};
-
-const ensureAuthProfile = async (nameOverride?: string) => {
-  const user = await getAuthUser();
-  if (!user) return;
-  await upsertProfileForUser(user, nameOverride);
 };
 
 const getSupabaseUserId = async (supabase: ReturnType<typeof getSupabaseClient>) => {
@@ -235,12 +218,20 @@ export const dataService = {
   initAuthProfile: async (nameOverride?: string) => {
     const supabase = getSupabaseClient();
     if (!supabase || authProfileInitialized) return;
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn('Failed to load auth session', error);
+      return;
+    }
+    if (!data.session?.user) {
+      return;
+    }
     authProfileInitialized = true;
     supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) return;
       void upsertProfileForUser(session.user, nameOverride);
     });
-    await ensureAuthProfile(nameOverride);
+    await upsertProfileForUser(data.session.user, nameOverride);
   },
 
   getProfile: async (): Promise<RealtorProfile> => {

@@ -22,3 +22,17 @@ View your app in AI Studio: https://ai.studio/apps/drive/1_XLE-ICPkgAeN1oo_OrMej
    - Configure the Supabase Edge Function environment with `OPENAI_SECRET_KEY` (or `OPENAI_API_KEY`) for AI responses.
 3. Run the app:
    `npm run dev`
+
+## Supabase verification
+
+Use the helper script to verify the deployed schema includes `realtor_profiles.cadence_type`,
+`cadence_custom_days`, and that RLS allows authenticated inserts/updates:
+
+```bash
+SUPABASE_URL=... SUPABASE_ANON_KEY=... \
+SUPABASE_TEST_EMAIL=... SUPABASE_TEST_PASSWORD=... \
+node scripts/verify-realtor-profile-schema.mjs
+```
+
+If the script reports missing columns or RLS issues, apply the latest migration in
+`supabase/migrations`.
