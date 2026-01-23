@@ -7,6 +7,7 @@ import { dataService } from '../services/dataService';
 const CommuteMode: React.FC = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [transcript, setTranscript] = useState('');
+    const [finalTranscript, setFinalTranscript] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [speechSupported, setSpeechSupported] = useState(true);
     const [speechError, setSpeechError] = useState('');
@@ -21,6 +22,7 @@ const CommuteMode: React.FC = () => {
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const recognitionRef = useRef<any>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const followUpTimeoutRef = useRef<number | null>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -59,16 +61,25 @@ const CommuteMode: React.FC = () => {
         if (isRecording) {
             recognitionRef.current?.stop();
             setIsRecording(false);
+            setFinalTranscript(transcript.trim());
         } else {
             setTranscript('');
+            setFinalTranscript('');
+            setFollowUpResponse('');
+            setFollowUpQuestions([]);
+            setIsRefining(false);
             setSpeechError('');
+            if (followUpTimeoutRef.current !== null) {
+                window.clearTimeout(followUpTimeoutRef.current);
+                followUpTimeoutRef.current = null;
+            }
             recognitionRef.current?.start();
             setIsRecording(true);
         }
     };
 
     useEffect(() => {
-        if (!transcript.trim()) {
+        if (!finalTranscript.trim()) {
             setFollowUpResponse('');
             setFollowUpQuestions([]);
             return;
@@ -76,14 +87,20 @@ const CommuteMode: React.FC = () => {
 
         const timeout = window.setTimeout(async () => {
             setIsRefining(true);
-            const followUp = await generateBrainDumpFollowUps(transcript);
+            const followUp = await generateBrainDumpFollowUps(finalTranscript);
             setFollowUpResponse(followUp.response);
             setFollowUpQuestions(followUp.questions);
             setIsRefining(false);
         }, 900);
+        followUpTimeoutRef.current = timeout;
 
-        return () => window.clearTimeout(timeout);
-    }, [transcript]);
+        return () => {
+            window.clearTimeout(timeout);
+            if (followUpTimeoutRef.current === timeout) {
+                followUpTimeoutRef.current = null;
+            }
+        };
+    }, [finalTranscript]);
 
     useEffect(() => {
         if (!isVoiceEnabled) {
@@ -161,8 +178,15 @@ const CommuteMode: React.FC = () => {
         navigate('/');
     };
 
+    const handleFinalizeTranscript = () => {
+        if (!transcript.trim()) {
+            return;
+        }
+        setFinalTranscript(transcript.trim());
+    };
+
     return (
-        <div className="fixed inset-0 bg-slate-950 z-[100] flex flex-col p-8 items-center justify-between animate-in fade-in duration-500">
+        <div className="min-h-screen bg-slate-950 z-[100] flex flex-col p-8 items-center justify-between animate-in fade-in duration-500 overflow-y-auto">
             {/* Header */}
             <div className="w-full flex justify-between items-center pt-4">
                 <button onClick={() => navigate('/')} className="text-slate-500 font-black uppercase text-xs tracking-widest border border-white/5 px-6 py-3 rounded-full">
@@ -292,6 +316,14 @@ const CommuteMode: React.FC = () => {
 
             {/* Action Bar */}
             <div className="w-full pb-8 flex flex-col gap-4">
+                <button
+                    type="button"
+                    disabled={!transcript || isRecording}
+                    onClick={handleFinalizeTranscript}
+                    className={`w-full py-4 rounded-3xl font-black uppercase tracking-[0.2em] text-sm transition-all ${transcript && !isRecording ? 'bg-indigo-500/90 text-white hover:bg-indigo-400 active:scale-95' : 'bg-slate-900 text-slate-700 opacity-50 cursor-not-allowed'}`}
+                >
+                    {isRecording ? 'Finish Recording to Continue' : 'Finished Recording'}
+                </button>
                 <button 
                     disabled={!transcript || isProcessing}
                     onClick={handleProcess}
