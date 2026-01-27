@@ -1,27 +1,41 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
+import { corsHeaders, handleOptions } from '../_shared/cors.ts';
 
 const OPENAI_MODEL = 'gpt-4o-mini';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
 
 const getOpenAiKey = () =>
   Deno.env.get('OPENAI_SECRET_KEY') ??
   Deno.env.get('OPENAI_API_KEY');
 
 Deno.serve(async req => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
+  const origin = req.headers.get('origin');
+  const baseHeaders = corsHeaders(origin);
+  const authHeader = req.headers.get('authorization');
+  const apiKeyHeader = req.headers.get('apikey');
+  const clientInfo = req.headers.get('x-client-info');
+  const contentType = req.headers.get('content-type');
+  const accept = req.headers.get('accept');
+  console.log('mort-openai request', {
+    method: req.method,
+    origin,
+    headers: {
+      authorization: authHeader,
+      apikey: apiKeyHeader,
+      'x-client-info': clientInfo,
+      'content-type': contentType,
+      accept,
+    },
+  });
+
+  const optionsResponse = handleOptions(req);
+  if (optionsResponse) {
+    return optionsResponse;
   }
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -30,20 +44,19 @@ Deno.serve(async req => {
   if (!supabaseUrl || !serviceRoleKey) {
     return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  const authHeader = req.headers.get('Authorization') ?? '';
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    global: { headers: { Authorization: authHeader } },
+    global: { headers: { Authorization: authHeader ?? '' } },
   });
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -51,7 +64,7 @@ Deno.serve(async req => {
   if (!openAiKey) {
     return new Response(JSON.stringify({ error: 'OpenAI key missing' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -61,7 +74,7 @@ Deno.serve(async req => {
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -69,7 +82,7 @@ Deno.serve(async req => {
   if (!prompt) {
     return new Response(JSON.stringify({ error: 'Prompt required' }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -90,7 +103,7 @@ Deno.serve(async req => {
     if (!response.ok) {
       return new Response(JSON.stringify({ error: 'OpenAI request failed' }), {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...baseHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -102,18 +115,18 @@ Deno.serve(async req => {
     } catch {
       return new Response(JSON.stringify({ error: 'Invalid OpenAI response' }), {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...baseHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     return new Response(JSON.stringify({ data: parsed }), {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   } catch {
     return new Response(JSON.stringify({ error: 'OpenAI request failed' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

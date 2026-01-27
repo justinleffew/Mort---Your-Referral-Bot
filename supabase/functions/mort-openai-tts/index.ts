@@ -1,16 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
+import { corsHeaders, handleOptions } from '../_shared/cors.ts';
 
 const OPENAI_TTS_MODEL = 'gpt-4o-mini-tts';
 const OPENAI_TTS_URL = 'https://api.openai.com/v1/audio/speech';
 const DEFAULT_VOICE = 'alloy';
 const ALLOWED_VOICES = new Set(['alloy', 'nova']);
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
 
 const getOpenAiKey = () =>
   Deno.env.get('OPENAI_SECRET_KEY') ??
@@ -26,13 +20,33 @@ const toBase64 = (buffer: ArrayBuffer) => {
 };
 
 Deno.serve(async req => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
+  const origin = req.headers.get('origin');
+  const baseHeaders = corsHeaders(origin);
+  const authHeader = req.headers.get('authorization');
+  const apiKeyHeader = req.headers.get('apikey');
+  const clientInfo = req.headers.get('x-client-info');
+  const contentType = req.headers.get('content-type');
+  const accept = req.headers.get('accept');
+  console.log('mort-openai-tts request', {
+    method: req.method,
+    origin,
+    headers: {
+      authorization: authHeader,
+      apikey: apiKeyHeader,
+      'x-client-info': clientInfo,
+      'content-type': contentType,
+      accept,
+    },
+  });
+
+  const optionsResponse = handleOptions(req);
+  if (optionsResponse) {
+    return optionsResponse;
   }
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -41,20 +55,19 @@ Deno.serve(async req => {
   if (!supabaseUrl || !serviceRoleKey) {
     return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  const authHeader = req.headers.get('Authorization') ?? '';
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    global: { headers: { Authorization: authHeader } },
+    global: { headers: { Authorization: authHeader ?? '' } },
   });
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -62,7 +75,7 @@ Deno.serve(async req => {
   if (!openAiKey) {
     return new Response(JSON.stringify({ error: 'OpenAI key missing' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -72,7 +85,7 @@ Deno.serve(async req => {
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -80,7 +93,7 @@ Deno.serve(async req => {
   if (!text) {
     return new Response(JSON.stringify({ error: 'Text required' }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -105,7 +118,7 @@ Deno.serve(async req => {
     if (!response.ok) {
       return new Response(JSON.stringify({ error: 'OpenAI request failed' }), {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...baseHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -115,12 +128,12 @@ Deno.serve(async req => {
 
     return new Response(JSON.stringify({ data: { audio, mimeType } }), {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   } catch {
     return new Response(JSON.stringify({ error: 'OpenAI request failed' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

@@ -1,5 +1,6 @@
 import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient, GeneralAssistResponse } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
+import { invokeEdgeFunction } from "./edgeFunctions";
 
 type EdgeFunctionResponse<T> = {
     data?: T;
@@ -21,15 +22,11 @@ const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
         throw new Error(AUTH_REQUIRED_MESSAGE);
     }
 
-    const { data, error } = await supabase.functions.invoke('mort-openai', {
-        body: { prompt }
+    const payload = await invokeEdgeFunction<EdgeFunctionResponse<T>, { prompt: string }>({
+        functionName: 'mort-openai',
+        body: { prompt },
+        accessToken: sessionData.session.access_token,
     });
-
-    if (error) {
-        throw new Error(error.message);
-    }
-
-    const payload = data as EdgeFunctionResponse<T> | null;
     if (!payload?.data) {
         throw new Error('Invalid AI response.');
     }
@@ -61,18 +58,14 @@ export const generateSpeechAudio = async (text: string, voice: string): Promise<
         throw new Error(AUTH_REQUIRED_MESSAGE);
     }
 
-    const { data, error } = await supabase.functions.invoke('mort-openai-tts', {
+    const payload = await invokeEdgeFunction<EdgeFunctionResponse<OpenAiTtsResponse>, { text: string; voice: string }>({
+        functionName: 'mort-openai-tts',
         body: {
             text: trimmed,
             voice
-        }
+        },
+        accessToken: sessionData.session.access_token,
     });
-
-    if (error) {
-        throw new Error(error.message);
-    }
-
-    const payload = data as EdgeFunctionResponse<OpenAiTtsResponse> | null;
     if (!payload?.data?.audio) {
         throw new Error('Invalid speech response.');
     }

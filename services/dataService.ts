@@ -12,6 +12,7 @@ import {
   TouchType,
 } from '../types';
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
+import { invokeEdgeFunction } from './edgeFunctions';
 
 const STORAGE_KEYS = {
   CONTACTS: 'mort_contacts',
@@ -902,17 +903,20 @@ export const dataService = {
       contacts.filter(contact => contact.do_not_contact).map(contact => contact.id)
     );
     if (supabase && userId) {
-      const { data, error } = await supabase.functions.invoke('mort-run-now', {
-        body: { exclude_do_not_contact: true },
-      });
-      if (error) {
-        console.warn('Failed to run now', error);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData?.session) {
+        console.warn('Failed to load session for run now', sessionError);
         return [];
       }
+      const data = await invokeEdgeFunction<{ opportunities?: Opportunity[] }, { exclude_do_not_contact: boolean }>({
+        functionName: 'mort-run-now',
+        body: { exclude_do_not_contact: true },
+        accessToken: sessionData.session.access_token,
+      });
       if (data && Array.isArray(data.opportunities)) {
         return (data.opportunities as Opportunity[]).filter(opportunity => !doNotContactIds.has(opportunity.contact_id));
       }
-      return Array.isArray(data) ? (data as Opportunity[]).filter(opportunity => !doNotContactIds.has(opportunity.contact_id)) : [];
+      return Array.isArray(data as unknown) ? (data as Opportunity[]).filter(opportunity => !doNotContactIds.has(opportunity.contact_id)) : [];
     }
 
     return [];
