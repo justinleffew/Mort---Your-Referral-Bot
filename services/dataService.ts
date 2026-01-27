@@ -82,6 +82,29 @@ const DEFAULT_PROFILE_CADENCE = {
   cadence_custom_days: DEFAULT_CADENCE_DAYS,
 };
 let authProfileInitialized = false;
+let profileSyncDisabled = false;
+
+const shouldDisableProfileSync = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
+  const status = error.status ?? Number(error.code);
+  if (status && [400, 401, 403].includes(status)) return true;
+  const message = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+  return (
+    message.includes('permission') ||
+    message.includes('jwt') ||
+    message.includes('row level security') ||
+    message.includes('realtor_profiles') ||
+    message.includes('schema cache') ||
+    message.includes('column') ||
+    message.includes('relation')
+  );
+};
+
+const disableProfileSync = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
+  if (!profileSyncDisabled && shouldDisableProfileSync(error)) {
+    profileSyncDisabled = true;
+    console.warn('Disabling Supabase profile sync due to repeated errors. Falling back to local storage.');
+  }
+};
 
 const resolveProfileName = (userName?: string, metadata?: Record<string, any>) => {
   const trimmed = userName?.trim();
@@ -114,6 +137,7 @@ const upsertProfileForUser = async (
   user: { id: string; user_metadata?: Record<string, any> },
   nameOverride?: string
 ) => {
+  if (profileSyncDisabled) return;
   const supabase = getSupabaseClient();
   if (!supabase) return;
   const name = resolveProfileName(nameOverride, user.user_metadata);
@@ -148,10 +172,12 @@ const upsertProfileForUser = async (
         );
       if (fallbackError) {
         console.warn('Failed to initialize profile (fallback)', fallbackError);
+        disableProfileSync(fallbackError);
       }
       return;
     }
     console.warn('Failed to initialize profile', error);
+    disableProfileSync(error);
   }
 };
 
@@ -229,6 +255,7 @@ export const dataService = {
     authProfileInitialized = true;
     supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) return;
+      if (profileSyncDisabled) return;
       void upsertProfileForUser(session.user, nameOverride);
     });
     await upsertProfileForUser(data.session.user, nameOverride);
@@ -237,7 +264,7 @@ export const dataService = {
   getProfile: async (): Promise<RealtorProfile> => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
-    if (supabase && userId) {
+    if (supabase && userId && !profileSyncDisabled) {
       // Supabase mode.
       const { data, error } = await supabase
         .from('realtor_profiles')
@@ -246,6 +273,7 @@ export const dataService = {
         .maybeSingle();
       if (error) {
         console.warn('Failed to load profile', error);
+        disableProfileSync(error);
       }
       if (data) {
         return withProfileDefaults({
@@ -265,7 +293,7 @@ export const dataService = {
   saveProfile: async (profile: RealtorProfile) => {
     const supabase = getSupabaseClient();
     const userId = await requireSupabaseUserId(supabase, 'save profile');
-    if (supabase && userId) {
+    if (supabase && userId && !profileSyncDisabled) {
       // Supabase mode.
       const payload = {
         user_id: userId,
@@ -285,10 +313,12 @@ export const dataService = {
           });
           if (fallbackError) {
             console.warn('Failed to save profile (fallback)', fallbackError);
+            disableProfileSync(fallbackError);
           }
           return;
         }
         console.warn('Failed to save profile', error);
+        disableProfileSync(error);
       }
       return;
     }
