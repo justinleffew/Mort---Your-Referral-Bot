@@ -20,7 +20,14 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
 
     try {
       const redirectUrl = new URL(configuredRedirect);
-      if (redirectUrl.hash || redirectUrl.pathname !== '/') {
+      if (redirectUrl.hash) {
+        return configuredRedirect;
+      }
+      if (redirectUrl.pathname.includes('/auth/callback')) {
+        // Ensure hash-based callback so Vercel never serves a 404 for /auth/callback.
+        return `${redirectUrl.origin}/#/auth/callback`;
+      }
+      if (redirectUrl.pathname !== '/') {
         return configuredRedirect;
       }
       redirectUrl.hash = '#/auth/callback';
