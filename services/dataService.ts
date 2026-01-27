@@ -457,13 +457,16 @@ export const dataService = {
         console.warn('Failed to add contact', error);
         return supabasePayload;
       }
-      await supabase.from('radar_state').insert({
-        contact_id: inserted.id,
-        user_id: userId,
-        reached_out: false,
-        angles_used_json: [],
-        last_refreshed_at: new Date().toISOString(),
-      });
+      await supabase.from('radar_state').upsert(
+        {
+          contact_id: inserted.id,
+          user_id: userId,
+          reached_out: false,
+          angles_used_json: [],
+          last_refreshed_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,contact_id' }
+      );
       return normalizeContact(inserted);
     }
 
@@ -635,7 +638,7 @@ export const dataService = {
       }
       if (data) return data;
       const fallback = defaultRadarState(contactId, userId);
-      await supabase.from('radar_state').insert(fallback);
+      await supabase.from('radar_state').upsert(fallback, { onConflict: 'user_id,contact_id' });
       return fallback;
     }
 
