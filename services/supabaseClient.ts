@@ -5,8 +5,9 @@ let hasWarnedMissingConfig = false;
 
 export const getSupabaseClient = () => {
   if (supabaseClient) return supabaseClient;
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  // Support Vercel/Supabase integration env vars to avoid falling back to local storage in production.
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? import.meta.env.SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) {
     if (!hasWarnedMissingConfig) {
       console.warn(
