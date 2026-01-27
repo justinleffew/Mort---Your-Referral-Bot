@@ -84,6 +84,10 @@ const DEFAULT_PROFILE_CADENCE = {
 };
 let authProfileInitialized = false;
 let profileSyncDisabled = false;
+let cachedProfile: RealtorProfile | null = null;
+let cachedProfileUserId: string | null = null;
+let profileFetchPromise: Promise<RealtorProfile> | null = null;
+let profileFetchErrorUserId: string | null = null;
 
 const shouldDisableProfileSync = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
   const status = error.status ?? Number(error.code);
@@ -107,14 +111,6 @@ const disableProfileSync = (error: { message?: string; code?: string; details?: 
   }
 };
 
-const resolveProfileName = (userName?: string, metadata?: Record<string, any>) => {
-  const trimmed = userName?.trim();
-  if (trimmed) return trimmed;
-  const metaName = metadata?.full_name || metadata?.name;
-  if (typeof metaName === 'string' && metaName.trim()) return metaName.trim();
-  return DEFAULT_PROFILE_NAME;
-};
-
 const resolveCadenceDays = (profile?: RealtorProfile) => {
   const cadenceType = profile?.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type;
   if (cadenceType === 'weekly') return 7;
@@ -134,52 +130,61 @@ const withProfileDefaults = (profile?: RealtorProfile | null): RealtorProfile =>
     profile?.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
 });
 
-const upsertProfileForUser = async (
-  user: { id: string; user_metadata?: Record<string, any> },
-  nameOverride?: string
-) => {
-  if (profileSyncDisabled) return;
-  const supabase = getSupabaseClient();
-  if (!supabase) return;
-  const name = resolveProfileName(nameOverride, user.user_metadata);
-  const payload = {
-    user_id: user.id,
-    name,
-    headshot: null,
-    cadence_type: DEFAULT_PROFILE_CADENCE.cadence_type,
-    cadence_custom_days: DEFAULT_PROFILE_CADENCE.cadence_custom_days,
-  };
-  const { error } = await supabase
-    .from('realtor_profiles')
-    .upsert(payload, {
-      onConflict: 'user_id',
-      ignoreDuplicates: true,
-    });
-  if (error) {
-    const message = error.message?.toLowerCase() ?? '';
-    if (message.includes('cadence_type') || message.includes('cadence_custom_days')) {
-      const { error: fallbackError } = await supabase
-        .from('realtor_profiles')
-        .upsert(
-          {
-            user_id: user.id,
-            name,
-            headshot: null,
-          },
-          {
-            onConflict: 'user_id',
-            ignoreDuplicates: true,
-          }
-        );
-      if (fallbackError) {
-        console.warn('Failed to initialize profile (fallback)', fallbackError);
-        disableProfileSync(fallbackError);
-      }
-      return;
-    }
-    console.warn('Failed to initialize profile', error);
-    disableProfileSync(error);
+const resetProfileCache = () => {
+  cachedProfile = null;
+  cachedProfileUserId = null;
+  profileFetchPromise = null;
+  profileFetchErrorUserId = null;
+};
+
+const selectProfileForUser = async (userId: string): Promise<RealtorProfile> => {
+  if (profileSyncDisabled) {
+    return withProfileDefaults(loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE));
   }
+  if (profileFetchErrorUserId === userId) {
+    return withProfileDefaults({ name: DEFAULT_PROFILE_NAME });
+  }
+  if (cachedProfile && cachedProfileUserId === userId) {
+    return cachedProfile;
+  }
+  if (profileFetchPromise && cachedProfileUserId === userId) {
+    return profileFetchPromise;
+  }
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return withProfileDefaults(loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE));
+  }
+  cachedProfileUserId = userId;
+  profileFetchPromise = (async () => {
+    const { data, error } = await supabase
+      .from('realtor_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) {
+      console.warn('Failed to load profile', error);
+      disableProfileSync(error);
+      profileFetchErrorUserId = userId;
+      profileFetchPromise = null;
+      return withProfileDefaults({ name: DEFAULT_PROFILE_NAME });
+    }
+    if (!data) {
+      console.warn('Profile missing for user', { userId });
+      profileFetchErrorUserId = userId;
+      profileFetchPromise = null;
+      return withProfileDefaults({ name: DEFAULT_PROFILE_NAME });
+    }
+    const profile = withProfileDefaults({
+      name: data.name,
+      headshot: data.headshot ?? undefined,
+      cadence_type: data.cadence_type ?? undefined,
+      cadence_custom_days: data.cadence_custom_days ?? undefined,
+    });
+    cachedProfile = profile;
+    profileFetchPromise = null;
+    return profile;
+  })();
+  return profileFetchPromise;
 };
 
 const getSupabaseUserId = async (supabase: ReturnType<typeof getSupabaseClient>) => {
@@ -242,7 +247,7 @@ const normalizeReferralEvent = (event: ReferralEvent): ReferralEvent => ({
 });
 
 export const dataService = {
-  initAuthProfile: async (nameOverride?: string) => {
+  initAuthProfile: async () => {
     const supabase = getSupabaseClient();
     if (!supabase || authProfileInitialized) return;
     const { data, error } = await supabase.auth.getSession();
@@ -250,41 +255,27 @@ export const dataService = {
       console.warn('Failed to load auth session', error);
       return;
     }
-    if (!data.session?.user) {
-      return;
-    }
     authProfileInitialized = true;
+    let lastUserId = data.session?.user?.id ?? null;
+    if (lastUserId) {
+      void selectProfileForUser(lastUserId);
+    }
     supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) return;
-      if (profileSyncDisabled) return;
-      void upsertProfileForUser(session.user, nameOverride);
+      const nextUserId = session?.user?.id ?? null;
+      if (nextUserId !== lastUserId) {
+        resetProfileCache();
+        lastUserId = nextUserId;
+      }
+      if (!nextUserId) return;
+      void selectProfileForUser(nextUserId);
     });
-    await upsertProfileForUser(data.session.user, nameOverride);
   },
 
   getProfile: async (): Promise<RealtorProfile> => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
     if (supabase && userId && !profileSyncDisabled) {
-      // Supabase mode.
-      const { data, error } = await supabase
-        .from('realtor_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (error) {
-        console.warn('Failed to load profile', error);
-        disableProfileSync(error);
-      }
-      if (data) {
-        return withProfileDefaults({
-          name: data.name,
-          headshot: data.headshot ?? undefined,
-          cadence_type: data.cadence_type ?? undefined,
-          cadence_custom_days: data.cadence_custom_days ?? undefined,
-        });
-      }
-      return withProfileDefaults({ name: DEFAULT_PROFILE_NAME });
+      return selectProfileForUser(userId);
     }
 
     // LocalStorage fallback.
@@ -297,29 +288,22 @@ export const dataService = {
     if (supabase && userId && !profileSyncDisabled) {
       // Supabase mode.
       const payload = {
-        user_id: userId,
         name: profile.name,
         headshot: profile.headshot ?? null,
-        cadence_type: profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
-        cadence_custom_days: profile.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
       };
-      const { error } = await supabase.from('realtor_profiles').upsert(payload);
+      const { error } = await supabase
+        .from('realtor_profiles')
+        .update(payload)
+        .eq('user_id', userId);
       if (error) {
-        const message = error.message?.toLowerCase() ?? '';
-        if (message.includes('cadence_type') || message.includes('cadence_custom_days')) {
-          const { error: fallbackError } = await supabase.from('realtor_profiles').upsert({
-            user_id: userId,
-            name: profile.name,
-            headshot: profile.headshot ?? null,
-          });
-          if (fallbackError) {
-            console.warn('Failed to save profile (fallback)', fallbackError);
-            disableProfileSync(fallbackError);
-          }
-          return;
-        }
         console.warn('Failed to save profile', error);
         disableProfileSync(error);
+      } else {
+        cachedProfile = withProfileDefaults({
+          ...profile,
+          headshot: profile.headshot ?? undefined,
+        });
+        cachedProfileUserId = userId;
       }
       return;
     }
