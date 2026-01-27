@@ -230,6 +230,66 @@ const normalizeContact = (contact: Contact): Contact => ({
   home_area_id: contact.home_area_id ?? null,
 });
 
+const CONTACT_INSERT_FIELDS = [
+  'id',
+  'user_id',
+  'full_name',
+  'phone',
+  'email',
+  'location_context',
+  'sale_date',
+  'last_contacted_at',
+  'tags',
+  'comfort_level',
+  'archived',
+  'created_at',
+  'radar_interests',
+  'family_details',
+  'mortgage_inference',
+  'suggested_action',
+] as const;
+
+const CONTACT_UPDATE_FIELDS = [
+  'full_name',
+  'phone',
+  'email',
+  'location_context',
+  'sale_date',
+  'last_contacted_at',
+  'tags',
+  'comfort_level',
+  'archived',
+  'radar_interests',
+  'family_details',
+  'mortgage_inference',
+  'suggested_action',
+] as const;
+
+type ContactInsertField = (typeof CONTACT_INSERT_FIELDS)[number];
+type ContactUpdateField = (typeof CONTACT_UPDATE_FIELDS)[number];
+
+const buildSupabaseContactInsertPayload = (contact: Contact) => {
+  const payload: Partial<Record<ContactInsertField, Contact[ContactInsertField]>> = {};
+  for (const field of CONTACT_INSERT_FIELDS) {
+    const value = contact[field];
+    if (value !== undefined) {
+      payload[field] = value;
+    }
+  }
+  return payload;
+};
+
+const buildSupabaseContactUpdatePayload = (data: Partial<Contact>) => {
+  const payload: Partial<Record<ContactUpdateField, Contact[ContactUpdateField]>> = {};
+  for (const field of CONTACT_UPDATE_FIELDS) {
+    const value = data[field];
+    if (value !== undefined) {
+      payload[field] = value;
+    }
+  }
+  return payload;
+};
+
 const defaultRadarState = (contactId: string, userId: string): RadarState => ({
   id: uuid(),
   contact_id: contactId,
@@ -387,7 +447,7 @@ export const dataService = {
 
     if (supabase && userId) {
       // Supabase mode.
-      const supabasePayload = buildContact(userId);
+      const supabasePayload = buildSupabaseContactInsertPayload(buildContact(userId));
       const { data: inserted, error } = await supabase
         .from('contacts')
         .insert(supabasePayload)
@@ -444,9 +504,10 @@ export const dataService = {
     const userId = await requireSupabaseUserId(supabase, 'update contact');
     if (supabase && userId) {
       // Supabase mode.
+      const supabasePayload = buildSupabaseContactUpdatePayload(data);
       const { error } = await supabase
         .from('contacts')
-        .update({ ...data, user_id: userId })
+        .update({ ...supabasePayload, user_id: userId })
         .eq('id', id)
         .eq('user_id', userId);
       if (error) {
