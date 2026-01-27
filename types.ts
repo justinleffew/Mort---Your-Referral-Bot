@@ -41,8 +41,7 @@ export interface Contact {
 export interface ContactNote {
   id: string;
   contact_id: string;
-  user_id: string;
-  note_text: string;
+  body: string;
   created_at: string;
 }
 

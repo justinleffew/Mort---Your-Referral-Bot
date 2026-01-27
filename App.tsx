@@ -923,7 +923,7 @@ const ContactDetail: React.FC = () => {
             type: 'note' as const,
             created_at: note.created_at,
             label: 'Note',
-            detail: note.note_text,
+            detail: note.body,
         })),
     ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -1217,7 +1217,7 @@ const ContactDetail: React.FC = () => {
                                     <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
                                         {new Date(note.created_at).toLocaleDateString()}
                                     </p>
-                                    <p className="mt-1">{note.note_text}</p>
+                                    <p className="mt-1">{note.body}</p>
                                 </div>
                             ))
                         )}

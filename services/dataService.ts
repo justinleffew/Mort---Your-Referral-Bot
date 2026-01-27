@@ -473,7 +473,6 @@ export const dataService = {
         .from('contact_notes')
         .select('*')
         .eq('contact_id', contactId)
-        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) {
         console.warn('Failed to load notes', error);
@@ -489,18 +488,19 @@ export const dataService = {
   addNote: async (contactId: string, text: string) => {
     const supabase = getSupabaseClient();
     const userId = await requireSupabaseUserId(supabase, 'add note');
-    const buildNote = (ownerId: string): ContactNote => ({
+    const buildNote = (): ContactNote => ({
       id: uuid(),
       contact_id: contactId,
-      user_id: ownerId,
-      note_text: text,
+      body: text,
       created_at: new Date().toISOString(),
     });
 
     if (supabase && userId) {
       // Supabase mode.
-      const note = buildNote(userId);
-      const { error } = await supabase.from('contact_notes').insert(note);
+      const { error } = await supabase.from('contact_notes').insert({
+        contact_id: contactId,
+        body: text,
+      });
       if (error) {
         console.warn('Failed to add note', error);
       }
@@ -508,8 +508,7 @@ export const dataService = {
     }
 
     // LocalStorage fallback.
-    const agentId = getAgentId();
-    const note = buildNote(agentId);
+    const note = buildNote();
     const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
     notes.push(note);
     save(STORAGE_KEYS.NOTES, notes);
@@ -521,9 +520,8 @@ export const dataService = {
     if (supabase && userId) {
       const { error } = await supabase
         .from('contact_notes')
-        .update({ note_text: text })
-        .eq('id', noteId)
-        .eq('user_id', userId);
+        .update({ body: text })
+        .eq('id', noteId);
       if (error) {
         console.warn('Failed to update note', error);
       }
@@ -533,7 +531,7 @@ export const dataService = {
     const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
     const index = notes.findIndex(n => n.id === noteId);
     if (index !== -1) {
-      notes[index] = { ...notes[index], note_text: text };
+      notes[index] = { ...notes[index], body: text };
       save(STORAGE_KEYS.NOTES, notes);
     }
   },
@@ -545,8 +543,7 @@ export const dataService = {
       const { error } = await supabase
         .from('contact_notes')
         .delete()
-        .eq('id', noteId)
-        .eq('user_id', userId);
+        .eq('id', noteId);
       if (error) {
         console.warn('Failed to delete note', error);
       }

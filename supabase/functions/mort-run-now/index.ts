@@ -19,7 +19,7 @@ type Candidate = {
 
 type NoteRow = {
   contact_id: string;
-  note_text: string;
+  body: string;
   created_at: string;
 };
 
@@ -57,7 +57,7 @@ const generateMessages = async (candidate: Candidate, notes: NoteRow[]) => {
 
   const snippets = notes
     .slice(0, 3)
-    .map(note => `- ${note.note_text}`)
+    .map(note => `- ${note.body}`)
     .join('\n');
 
   const reasons = [
@@ -220,8 +220,7 @@ Deno.serve(async req => {
   const contactIds = topCandidates.map(candidate => candidate.id);
   const { data: notesData } = await supabase
     .from('contact_notes')
-    .select('contact_id,note_text,created_at')
-    .eq('user_id', userId)
+    .select('contact_id,body,created_at')
     .in('contact_id', contactIds)
     .order('created_at', { ascending: false });
 
