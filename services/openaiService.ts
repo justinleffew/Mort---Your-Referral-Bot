@@ -92,7 +92,7 @@ export const generateRadarMessage = async (
 ): Promise<GeneratedMessage> => {
     const notesText = notes
         .slice(0, 5)
-        .map(n => `${new Date(n.created_at).toLocaleDateString()}: ${n.note_text}`)
+        .map(n => `${new Date(n.created_at).toLocaleDateString()}: ${n.body}`)
         .join(' | ');
     const interestsText = contact.radar_interests.join(', ');
     const mortgageContext = contact.mortgage_inference

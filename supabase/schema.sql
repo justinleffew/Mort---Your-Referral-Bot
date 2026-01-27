@@ -23,8 +23,7 @@ create table if not exists contacts (
 create table if not exists contact_notes (
   id uuid primary key,
   contact_id uuid references contacts(id) on delete cascade,
-  user_id text not null,
-  note_text text not null,
+  body text not null,
   created_at timestamptz default now()
 );
 
@@ -74,6 +73,8 @@ create table if not exists referral_events (
   updated_at timestamptz default now()
 );
 
+create index if not exists contact_notes_contact_id_idx on contact_notes(contact_id);
+
 alter table contacts enable row level security;
 alter table contact_notes enable row level security;
 alter table radar_state enable row level security;
@@ -112,23 +113,58 @@ create policy "contacts_delete_own" on contacts
 create policy "contact_notes_select_own" on contact_notes
   for select
   to authenticated
-  using (user_id = auth.uid()::text);
+  using (
+    exists (
+      select 1
+      from contacts c
+      where c.id = contact_notes.contact_id
+        and c.user_id = auth.uid()::text
+    )
+  );
 
 create policy "contact_notes_insert_own" on contact_notes
   for insert
   to authenticated
-  with check (user_id = auth.uid()::text);
+  with check (
+    exists (
+      select 1
+      from contacts c
+      where c.id = contact_notes.contact_id
+        and c.user_id = auth.uid()::text
+    )
+  );
 
 create policy "contact_notes_update_own" on contact_notes
   for update
   to authenticated
-  using (user_id = auth.uid()::text)
-  with check (user_id = auth.uid()::text);
+  using (
+    exists (
+      select 1
+      from contacts c
+      where c.id = contact_notes.contact_id
+        and c.user_id = auth.uid()::text
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from contacts c
+      where c.id = contact_notes.contact_id
+        and c.user_id = auth.uid()::text
+    )
+  );
 
 create policy "contact_notes_delete_own" on contact_notes
   for delete
   to authenticated
-  using (user_id = auth.uid()::text);
+  using (
+    exists (
+      select 1
+      from contacts c
+      where c.id = contact_notes.contact_id
+        and c.user_id = auth.uid()::text
+    )
+  );
 
 create policy "radar_state_select_own" on radar_state
   for select
