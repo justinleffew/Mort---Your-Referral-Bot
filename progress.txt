@@ -1,0 +1,11 @@
+## Codebase Patterns
+- (Add only durable, reusable patterns here. Not story-specific notes.)
+
+---
+
+## 2026-01-28 00:00 - INIT
+- Initialized progress log.
+- Files changed: progress.txt
+- Learnings for future iterations:
+  - Keep this file append-only.
+---
