@@ -27,3 +27,23 @@
   - Gotchas
     - None observed.
 ---
+## 2026-01-28 19:27 - US-002
+- What was implemented
+  - Switched frontend edge function helper to use Supabase functions.invoke and updated OpenAI/TTS calls to new function names.
+- Files changed
+  - services/edgeFunctions.ts
+  - services/openaiService.ts
+  - services/dataService.ts
+- Assumptions made (if any)
+  - Interpreted this change as supporting US-002 without completing all acceptance criteria; PRD status left unchanged per instructions.
+  - Supabase functions.invoke will attach auth headers automatically when a session exists, as required.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (fails: existing type errors in App.tsx, services/dataService.ts, services/supabaseClient.ts, supabase/functions/*)
+  - npm run build (pass)
+  - Skipped lint/tests (no scripts in package.json).
+- Learnings for future iterations:
+  - Patterns discovered
+    - Edge function calls are centralized via services/edgeFunctions.ts.
+  - Gotchas
+    - Repo typecheck currently fails due to unrelated TS errors and Deno edge function types.
+---
