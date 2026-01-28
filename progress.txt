@@ -9,3 +9,21 @@
 - Learnings for future iterations:
   - Keep this file append-only.
 ---
+## 2026-01-28 18:31 - US-001
+- What was implemented
+  - Parse explicit interest cues from contact notes and normalize/merge into radar_interests on note creation.
+- Files changed
+  - services/dataService.ts
+  - prd.json
+- Assumptions made (if any)
+  - Interpreted explicit interest cues as phrases like "interests/hobbies/likes/enjoys/into/interested in" within notes and normalized them to lowercase keywords.
+  - Treated the current HEAD as the base for the required branch because no main branch exists in this repo.
+- Tests / checks run (and results)
+  - npm run build (pass)
+  - Skipped lint/typecheck/tests (no scripts in package.json).
+- Learnings for future iterations:
+  - Patterns discovered
+    - dataService.addNote is the centralized place to augment notes with derived contact metadata.
+  - Gotchas
+    - None observed.
+---
