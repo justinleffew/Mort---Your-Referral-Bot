@@ -23,9 +23,8 @@ const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
     }
 
     const payload = await invokeEdgeFunction<EdgeFunctionResponse<T>, { prompt: string }>({
-        functionName: 'mort-openai',
+        functionName: 'open-ai',
         body: { prompt },
-        accessToken: sessionData.session.access_token,
     });
     if (!payload?.data) {
         throw new Error('Invalid AI response.');
@@ -59,12 +58,11 @@ export const generateSpeechAudio = async (text: string, voice: string): Promise<
     }
 
     const payload = await invokeEdgeFunction<EdgeFunctionResponse<OpenAiTtsResponse>, { text: string; voice: string }>({
-        functionName: 'mort-openai-tts',
+        functionName: 'quick-action',
         body: {
             text: trimmed,
             voice
         },
-        accessToken: sessionData.session.access_token,
     });
     if (!payload?.data?.audio) {
         throw new Error('Invalid speech response.');

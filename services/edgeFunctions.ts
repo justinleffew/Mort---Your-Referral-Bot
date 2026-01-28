@@ -1,59 +1,25 @@
-import { getSupabaseConfig } from './supabaseClient';
+import { getSupabaseClient } from './supabaseClient';
 
 type InvokeOptions<TBody> = {
   functionName: string;
   body: TBody;
-  accessToken?: string | null;
-};
-
-const buildFunctionUrl = (functionName: string, baseUrl: string) =>
-  `${baseUrl.replace(/\/$/, '')}/functions/v1/${functionName}`;
-
-const safeParseJson = (payload: string) => {
-  if (!payload) return null;
-  try {
-    return JSON.parse(payload);
-  } catch {
-    return null;
-  }
 };
 
 export const invokeEdgeFunction = async <TResponse, TBody>({
   functionName,
   body,
-  accessToken,
 }: InvokeOptions<TBody>): Promise<TResponse> => {
-  const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
-  if (!supabaseUrl || !supabaseAnonKey) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
     throw new Error('Supabase is not configured.');
   }
 
-  const headers = new Headers({
-    'Content-Type': 'application/json',
-    accept: 'application/json',
-    apikey: supabaseAnonKey,
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    body: body ?? {},
   });
-
-  if (accessToken) {
-    headers.set('Authorization', `Bearer ${accessToken}`);
+  if (error) {
+    throw new Error(error.message || `Request failed for ${functionName}`);
   }
 
-  const response = await fetch(buildFunctionUrl(functionName, supabaseUrl), {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body ?? {}),
-  });
-
-  const text = await response.text();
-  const parsed = safeParseJson(text);
-
-  if (!response.ok) {
-    const message =
-      (parsed && typeof parsed === 'object' && 'error' in parsed ? (parsed as { error?: string }).error : null) ||
-      response.statusText ||
-      `Request failed for ${functionName}`;
-    throw new Error(message || 'Request failed.');
-  }
-
-  return (parsed ?? ({} as TResponse)) as TResponse;
+  return (data ?? ({} as TResponse)) as TResponse;
 };

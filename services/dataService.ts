@@ -1013,7 +1013,6 @@ export const dataService = {
       const data = await invokeEdgeFunction<{ opportunities?: Opportunity[] }, { exclude_do_not_contact: boolean }>({
         functionName: 'mort-run-now',
         body: { exclude_do_not_contact: true },
-        accessToken: sessionData.session.access_token,
       });
       if (data && Array.isArray(data.opportunities)) {
         return (data.opportunities as Opportunity[]).filter(opportunity => !doNotContactIds.has(opportunity.contact_id));
