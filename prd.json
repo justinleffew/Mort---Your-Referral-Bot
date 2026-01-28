@@ -1,0 +1,100 @@
+{
+  "project": "Mort",
+  "branchName": "codex/mort-radar-001",
+  "description": "Mort is a Realtor relationship radar that detects timely reasons to reach out to contacts and generates copy-ready, human-sounding messages based on real-world events and personal interests.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Normalize and store contact interests for radar matching",
+      "description": "As Mort, I need structured, searchable interests derived from user-entered notes so I can match contacts to real-world events.",
+      "acceptanceCriteria": [
+        "Contacts support an array of normalized radar interests (strings or tags).",
+        "Freeform notes can be summarized or parsed into radar interests without losing original text.",
+        "No interests are inferred without explicit user-provided context.",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Do not over-normalize. Simple keyword-style interests are sufficient."
+    },
+    {
+      "id": "US-002",
+      "title": "Search external news and events relevant to contact interests",
+      "description": "As Mort, I want to search current news and events related to a contact’s interests so I can detect timely outreach opportunities.",
+      "acceptanceCriteria": [
+        "System can query external sources (via OpenAI or tool calls) using interest + location context.",
+        "Search results are recent and include a short explanation of relevance.",
+        "Results are deterministic for the same inputs (temperature low or zero).",
+        "Failures degrade gracefully without blocking the UI.",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Do not scrape directly. Use API-based search only."
+    },
+    {
+      "id": "US-003",
+      "title": "Score and filter outreach opportunities",
+      "description": "As Mort, I need to decide whether an event is strong enough to justify reaching out now.",
+      "acceptanceCriteria": [
+        "Each opportunity includes a numeric score and human-readable reasons.",
+        "Opportunities are filtered if cadence, suppression, or do-not-contact rules apply.",
+        "The same contact is not repeatedly suggested for the same event.",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Favor under-triggering over spamming."
+    },
+    {
+      "id": "US-004",
+      "title": "Generate copy-ready text message suggestions",
+      "description": "As a Realtor, I want short, natural text messages I can copy and send without editing.",
+      "acceptanceCriteria": [
+        "Each opportunity generates 2–5 message variants.",
+        "Messages are under 320 characters and sound human.",
+        "Messages clearly reference the triggering event.",
+        "No emojis, no sales language, no calls to action.",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "This is not marketing copy. Err casual and personal."
+    },
+    {
+      "id": "US-005",
+      "title": "Expose 'Run Now' opportunities in the UI",
+      "description": "As a Realtor, I want to see who I should reach out to right now and why.",
+      "acceptanceCriteria": [
+        "UI displays contact name, score, reasons, and message variants.",
+        "User can copy a message and mark the contact as contacted.",
+        "Marking contacted updates suppression and cadence state.",
+        "Typecheck passes",
+        "Lint passes",
+        "Manual browser verification completed"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Do not auto-refresh or auto-trigger outreach."
+    },
+    {
+      "id": "US-006",
+      "title": "Persist radar state to prevent repeated prompts",
+      "description": "As Mort, I need memory of what I’ve already suggested so I don’t nag the user.",
+      "acceptanceCriteria": [
+        "Radar state tracks events/angles already used per contact.",
+        "Previously used angles are excluded from future suggestions.",
+        "Suppression windows are respected.",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "This memory must be explicit and inspectable."
+    }
+  ]
+}
