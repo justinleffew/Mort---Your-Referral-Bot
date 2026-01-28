@@ -306,6 +306,35 @@ const normalizeReferralEvent = (event: ReferralEvent): ReferralEvent => ({
   notes: event.notes ?? '',
 });
 
+const normalizeInterest = (value: string) => value
+  .toLowerCase()
+  .replace(/[\u2019']/g, '')
+  .replace(/[^\w\s-]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const splitInterestList = (value: string) => value
+  .replace(/\s+(and|&)\s+/gi, ',')
+  .split(/[;,]/)
+  .map(item => normalizeInterest(item))
+  .filter(Boolean);
+
+const extractRadarInterestsFromText = (text: string) => {
+  const sentences = text.split(/[\n.]+/).map(sentence => sentence.trim()).filter(Boolean);
+  const interests: string[] = [];
+  const cuePattern = /(interests?|hobbies|likes|loves|enjoys|into|interested in|favorite|favourite|follows)\s*:?\s*(.+)/i;
+
+  for (const sentence of sentences) {
+    const match = sentence.match(cuePattern);
+    if (!match) continue;
+    const value = match[2]?.trim();
+    if (!value) continue;
+    interests.push(...splitInterestList(value));
+  }
+
+  return Array.from(new Set(interests));
+};
+
 export const dataService = {
   initAuthProfile: async () => {
     const supabase = getSupabaseClient();
@@ -552,6 +581,7 @@ export const dataService = {
   addNote: async (contactId: string, text: string) => {
     const supabase = getSupabaseClient();
     const userId = await requireSupabaseUserId(supabase, 'add note');
+    const parsedInterests = extractRadarInterestsFromText(text);
     const buildNote = (): ContactNote => ({
       id: uuid(),
       contact_id: contactId,
@@ -568,6 +598,19 @@ export const dataService = {
       if (error) {
         console.warn('Failed to add note', error);
       }
+      if (parsedInterests.length > 0) {
+        const contact = await dataService.getContactById(contactId);
+        if (contact) {
+          const normalizedCurrent = contact.radar_interests.map(normalizeInterest).filter(Boolean);
+          const merged = Array.from(new Set([...normalizedCurrent, ...parsedInterests]));
+          const needsUpdate = normalizedCurrent.length !== contact.radar_interests.length
+            || contact.radar_interests.some(interest => normalizeInterest(interest) !== interest)
+            || merged.length !== normalizedCurrent.length;
+          if (needsUpdate) {
+            await dataService.updateContact(contactId, { radar_interests: merged });
+          }
+        }
+      }
       return;
     }
 
@@ -576,6 +619,20 @@ export const dataService = {
     const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
     notes.push(note);
     save(STORAGE_KEYS.NOTES, notes);
+
+    if (parsedInterests.length > 0) {
+      const contact = await dataService.getContactById(contactId);
+      if (contact) {
+        const normalizedCurrent = contact.radar_interests.map(normalizeInterest).filter(Boolean);
+        const merged = Array.from(new Set([...normalizedCurrent, ...parsedInterests]));
+        const needsUpdate = normalizedCurrent.length !== contact.radar_interests.length
+          || contact.radar_interests.some(interest => normalizeInterest(interest) !== interest)
+          || merged.length !== normalizedCurrent.length;
+        if (needsUpdate) {
+          await dataService.updateContact(contactId, { radar_interests: merged });
+        }
+      }
+    }
   },
 
   updateNote: async (noteId: string, text: string) => {
