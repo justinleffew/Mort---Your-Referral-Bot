@@ -257,6 +257,25 @@
 - Learnings for future iterations:
   - Patterns discovered
     - None.
+- Gotchas
+  - None.
+---
+## 2026-01-29 19:15 - ADHOC-SUPABASE-FUNCTION-DEPLOY
+- What was implemented
+  - Documented Supabase CLI deployment steps for all edge functions with folder-name endpoints and legacy slug cleanup.
+  - Clarified OpenAI env var unification requirements for Supabase and Vercel.
+- Files changed
+  - DEPLOY.md
+  - README.md
+- Assumptions made (if any)
+  - Treated this request as an ad-hoc deployment/documentation update not mapped to a PRD story.
+  - Assumed Supabase CLI deployments use the function folder names as the endpoint slugs.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
   - Gotchas
     - None.
 ---
