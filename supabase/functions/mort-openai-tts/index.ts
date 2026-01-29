@@ -1,5 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
-import { corsHeaders, handleOptions } from '../_shared/cors.ts';
 
 const OPENAI_TTS_MODEL = 'gpt-4o-mini-tts';
 const OPENAI_TTS_URL = 'https://api.openai.com/v1/audio/speech';
@@ -9,6 +8,39 @@ const ALLOWED_VOICES = new Set(['alloy', 'nova']);
 const getOpenAiKey = () =>
   Deno.env.get('OPENAI_SECRET_KEY') ??
   Deno.env.get('OPENAI_API_KEY');
+
+const corsHeaders = (req: Request) => {
+  const origin = req.headers.get('origin');
+  let allowOrigin = '';
+
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      const hostname = url.hostname;
+      const isVercel = hostname.endsWith('.vercel.app');
+      const isLocalhost = hostname === 'localhost';
+      const isHeydad = origin === 'https://heydad.pro' || origin === 'https://www.heydad.pro';
+
+      if (isHeydad || isVercel || isLocalhost) {
+        allowOrigin = origin;
+      }
+    } catch {
+      // Ignore invalid origin values.
+    }
+  }
+
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
+
+  if (allowOrigin) {
+    headers['Access-Control-Allow-Origin'] = allowOrigin;
+  }
+
+  return headers;
+};
 
 const toBase64 = (buffer: ArrayBuffer) => {
   const bytes = new Uint8Array(buffer);
@@ -20,28 +52,15 @@ const toBase64 = (buffer: ArrayBuffer) => {
 };
 
 Deno.serve(async req => {
-  const origin = req.headers.get('origin');
-  const baseHeaders = corsHeaders(origin);
-  const authHeader = req.headers.get('authorization');
-  const apiKeyHeader = req.headers.get('apikey');
-  const clientInfo = req.headers.get('x-client-info');
-  const contentType = req.headers.get('content-type');
-  const accept = req.headers.get('accept');
+  const baseHeaders = corsHeaders(req);
   console.log('mort-openai-tts request', {
     method: req.method,
-    origin,
-    headers: {
-      authorization: authHeader,
-      apikey: apiKeyHeader,
-      'x-client-info': clientInfo,
-      'content-type': contentType,
-      accept,
-    },
+    origin: req.headers.get('origin'),
   });
+  const authHeader = req.headers.get('authorization');
 
-  const optionsResponse = handleOptions(req);
-  if (optionsResponse) {
-    return optionsResponse;
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: baseHeaders });
   }
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
