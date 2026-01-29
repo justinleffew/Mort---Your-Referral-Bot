@@ -9,7 +9,6 @@ const CommuteMode: React.FC = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [conversationTranscript, setConversationTranscript] = useState('');
-    const [lastFinalizedSnippet, setLastFinalizedSnippet] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [speechSupported, setSpeechSupported] = useState(true);
     const [speechError, setSpeechError] = useState('');
@@ -18,7 +17,7 @@ const CommuteMode: React.FC = () => {
     const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
     const [isRefining, setIsRefining] = useState(false);
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
-    const [selectedVoice, setSelectedVoice] = useState<'alloy' | 'nova'>('alloy');
+    const [selectedVoice, setSelectedVoice] = useState<'alloy' | 'nova'>('nova');
     const [ttsError, setTtsError] = useState('');
     const [voiceAuthMessage, setVoiceAuthMessage] = useState('');
     const [isTtsLoading, setIsTtsLoading] = useState(false);
@@ -26,6 +25,10 @@ const CommuteMode: React.FC = () => {
     const recognitionRef = useRef<any>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const followUpTimeoutRef = useRef<number | null>(null);
+    const silenceTimeoutRef = useRef<number | null>(null);
+    const speechStartRef = useRef<number | null>(null);
+    const latestTranscriptRef = useRef<string>('');
+    const isRecordingRef = useRef(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -45,7 +48,13 @@ const CommuteMode: React.FC = () => {
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 current += event.results[i][0].transcript;
             }
-            setTranscript(current);
+            const trimmed = current.trim();
+            setTranscript(trimmed);
+            latestTranscriptRef.current = trimmed;
+            if (!speechStartRef.current) {
+                speechStartRef.current = Date.now();
+            }
+            scheduleSilenceStop();
         };
 
         recognitionRef.current.onerror = (event: any) => {
@@ -55,6 +64,13 @@ const CommuteMode: React.FC = () => {
         recognitionRef.current.onnomatch = () => {
             setSpeechError('No speech could be recognized. Try again or use manual entry.');
         };
+
+        recognitionRef.current.onend = () => {
+            if (isRecordingRef.current) {
+                setIsRecording(false);
+            }
+            clearSilenceTimeout();
+        };
     }, []);
 
     const appendToConversation = (newTranscript: string) => {
@@ -63,35 +79,61 @@ const CommuteMode: React.FC = () => {
             return;
         }
         setConversationTranscript((prev) => (prev ? `${prev}\n${trimmedTranscript}` : trimmedTranscript));
-        setLastFinalizedSnippet(trimmedTranscript);
     };
 
-    const toggleRecording = () => {
+    const clearSilenceTimeout = () => {
+        if (silenceTimeoutRef.current !== null) {
+            window.clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
+        }
+    };
+
+    const scheduleSilenceStop = () => {
+        if (!isRecordingRef.current) {
+            return;
+        }
+        clearSilenceTimeout();
+        const elapsed = speechStartRef.current ? Date.now() - speechStartRef.current : 0;
+        const delay = elapsed > 8000 ? 2000 : 1200;
+        silenceTimeoutRef.current = window.setTimeout(() => {
+            const finalTranscript = latestTranscriptRef.current.trim();
+            if (finalTranscript) {
+                stopRecording(finalTranscript);
+            }
+        }, delay);
+    };
+
+    const stopRecording = (finalTranscript: string) => {
+        clearSilenceTimeout();
+        recognitionRef.current?.stop();
+        setIsRecording(false);
+        appendToConversation(finalTranscript);
+    };
+
+    const startRecording = () => {
         if (!speechSupported) {
             return;
         }
-        if (isRecording) {
-            recognitionRef.current?.stop();
-            setIsRecording(false);
-            appendToConversation(transcript.trim());
-        } else {
-            const isFollowUpCycle = conversationTranscript.trim().length > 0 && (followUpQuestions.length > 0 || followUpResponse || isRefining);
-            setTranscript('');
-            if (!isFollowUpCycle) {
-                setConversationTranscript('');
-                setLastFinalizedSnippet('');
-                setFollowUpResponse('');
-                setFollowUpQuestions([]);
-                setIsRefining(false);
-            }
-            setSpeechError('');
-            if (followUpTimeoutRef.current !== null) {
-                window.clearTimeout(followUpTimeoutRef.current);
-                followUpTimeoutRef.current = null;
-            }
-            recognitionRef.current?.start();
-            setIsRecording(true);
+        if (isRecordingRef.current) {
+            return;
         }
+        const isFollowUpCycle = conversationTranscript.trim().length > 0 && (followUpQuestions.length > 0 || followUpResponse || isRefining);
+        setTranscript('');
+        latestTranscriptRef.current = '';
+        speechStartRef.current = Date.now();
+        if (!isFollowUpCycle) {
+            setConversationTranscript('');
+            setFollowUpResponse('');
+            setFollowUpQuestions([]);
+            setIsRefining(false);
+        }
+        setSpeechError('');
+        if (followUpTimeoutRef.current !== null) {
+            window.clearTimeout(followUpTimeoutRef.current);
+            followUpTimeoutRef.current = null;
+        }
+        recognitionRef.current?.start();
+        setIsRecording(true);
     };
 
     useEffect(() => {
@@ -101,13 +143,14 @@ const CommuteMode: React.FC = () => {
             return;
         }
 
+        const delay = conversationTranscript.length > 240 ? 1600 : 1200;
         const timeout = window.setTimeout(async () => {
             setIsRefining(true);
             const followUp = await generateBrainDumpFollowUps(conversationTranscript);
             setFollowUpResponse(followUp.response);
             setFollowUpQuestions(followUp.questions);
             setIsRefining(false);
-        }, 900);
+        }, delay);
         followUpTimeoutRef.current = timeout;
 
         return () => {
@@ -240,15 +283,9 @@ const CommuteMode: React.FC = () => {
         navigate('/');
     };
 
-    const handleFinalizeTranscript = () => {
-        if (!transcript.trim()) {
-            return;
-        }
-        if (transcript.trim() === lastFinalizedSnippet) {
-            return;
-        }
-        appendToConversation(transcript.trim());
-    };
+    useEffect(() => {
+        isRecordingRef.current = isRecording;
+    }, [isRecording]);
 
     return (
         <div className="min-h-screen bg-slate-950 z-[100] flex flex-col p-8 items-center justify-between animate-in fade-in duration-500 overflow-y-auto">
@@ -271,7 +308,7 @@ const CommuteMode: React.FC = () => {
                 </div>
 
                 <button 
-                    onClick={toggleRecording}
+                    onClick={startRecording}
                     disabled={!speechSupported}
                     className={`w-56 h-56 rounded-full flex items-center justify-center transition-all duration-700 relative ${isRecording ? 'bg-pink-500 shadow-[0_0_80px_rgba(236,72,153,0.6)]' : 'bg-slate-900 border-4 border-slate-800'} ${speechSupported ? '' : 'opacity-40 cursor-not-allowed'}`}
                 >
@@ -391,14 +428,6 @@ const CommuteMode: React.FC = () => {
 
             {/* Action Bar */}
             <div className="w-full pb-8 flex flex-col gap-4">
-                <button
-                    type="button"
-                    disabled={!transcript || isRecording}
-                    onClick={handleFinalizeTranscript}
-                    className={`w-full py-4 rounded-3xl font-black uppercase tracking-[0.2em] text-sm transition-all ${transcript && !isRecording ? 'bg-indigo-500/90 text-white hover:bg-indigo-400 active:scale-95' : 'bg-slate-900 text-slate-700 opacity-50 cursor-not-allowed'}`}
-                >
-                    {isRecording ? 'Finish Recording to Continue' : 'Finished Recording'}
-                </button>
                 <button 
                     disabled={!transcript || isProcessing}
                     onClick={handleProcess}

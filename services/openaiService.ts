@@ -24,7 +24,7 @@ const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
     }
 
     const payload = await invokeEdgeFunction<EdgeFunctionResponse<T>, { prompt: string }>({
-        functionName: 'open-ai',
+        functionName: 'mort-openai',
         body: { prompt },
     });
     if (!payload?.data) {
@@ -59,7 +59,7 @@ export const generateSpeechAudio = async (text: string, voice: string): Promise<
     }
 
     const payload = await invokeEdgeFunction<EdgeFunctionResponse<OpenAiTtsResponse>, { text: string; voice: string }>({
-        functionName: 'quick-action',
+        functionName: 'mort-openai-tts',
         body: {
             text: trimmed,
             voice
@@ -225,7 +225,7 @@ const buildBrainDumpFollowUpFallback = (transcript: string) => {
     if (hasLastName) {
         if (!hasName && hasSport) {
             return {
-                response: `Got it — what is their first name and do they have a favorite ${sport} team? More information now means better touchpoints and more referrals for you!`,
+                response: `Got it — sounds like ${sport} is a real interest here. What’s their first name, and do they have a favorite ${sport} team?`,
                 questions: [
                     "What is their first name?",
                     `Do they have a favorite ${sport} team?`
@@ -235,17 +235,17 @@ const buildBrainDumpFollowUpFallback = (transcript: string) => {
 
         if (!hasName) {
             return {
-                response: "Got it — what is their first name and any favorite interests or milestones to remember? More information now means better touchpoints and more referrals for you!",
+                response: "Got it — who are we talking about? What’s their first name, and is there a specific interest or milestone to remember?",
                 questions: [
                     "What is their first name?",
-                    "Any favorite interests, teams, or milestones to note?"
+                    "Any specific interests, teams, or milestones to note?"
                 ]
             };
         }
 
         if (hasSport) {
             return {
-                response: `Got it — do they have a favorite ${sport} team? More information now means better touchpoints and more referrals for you!`,
+                response: `Got it — do they have a favorite ${sport} team?`,
                 questions: [
                     `Do they have a favorite ${sport} team?`
                 ]
@@ -253,7 +253,7 @@ const buildBrainDumpFollowUpFallback = (transcript: string) => {
         }
 
         return {
-            response: "Got it — any favorite interests or milestones to remember? More information now means better touchpoints and more referrals for you!",
+            response: "Got it — any favorite interests or milestones to remember?",
             questions: [
                 "Any favorite interests, teams, or milestones to note?"
             ]
@@ -262,7 +262,7 @@ const buildBrainDumpFollowUpFallback = (transcript: string) => {
 
     if (hasName && hasSport) {
         return {
-            response: `Got it — what is ${name}'s last name and do they have a favorite ${sport} team? More information now means better touchpoints and more referrals for you!`,
+            response: `Got it — love the ${sport} detail. What’s ${name}'s last name, and do they have a favorite ${sport} team?`,
             questions: [
                 `What is ${name}'s last name?`,
                 `Do they have a favorite ${sport} team?`
@@ -272,7 +272,7 @@ const buildBrainDumpFollowUpFallback = (transcript: string) => {
 
     if (hasName) {
         return {
-            response: `Got it — what is ${name}'s last name and any favorite interests or milestones to remember? More information now means better touchpoints and more referrals for you!`,
+            response: `Got it — what’s ${name}'s last name, and is there a specific interest or milestone to remember?`,
             questions: [
                 `What is ${name}'s last name?`,
                 "Any favorite interests, teams, or milestones to note?"
@@ -281,7 +281,7 @@ const buildBrainDumpFollowUpFallback = (transcript: string) => {
     }
 
     return {
-        response: "Got it — can you share their full name and one specific interest or milestone? More information now means better touchpoints and more referrals for you!",
+        response: "Got it — sounds like a past client. What’s their full name, and one specific interest or milestone you want to remember?",
         questions: [
             "What is their full name?",
             "Any specific interests, teams, or milestones to remember?"
@@ -294,11 +294,11 @@ export const generateBrainDumpFollowUps = async (transcript: string): Promise<{ 
 
     const prompt = `
     You are Mort, a CRM assistant for real estate agents.
-    Find vague or overly broad details in this voice transcript and ask short, specific follow-up questions.
-    Examples of vague details: "sports", "music", "food", "travel", "business", "investing".
-    Ask for specificity that would enable proactive outreach (teams, artists, cuisines, destinations, companies, etc.).
-    Also provide one friendly response sentence that acknowledges what the agent said and explains why details help.
-    If nothing is vague, return an empty questions array but still provide the response sentence.
+    Respond conversationally like a helpful assistant who just listened.
+    First: acknowledge what was said and infer intent naturally.
+    Then: ask only the missing detail(s) needed next, in a warm, human tone.
+    Avoid robotic forms, lists, or marketing language.
+    If nothing is vague or missing, return an empty questions array but still provide the response sentence.
 
     Transcript: "${transcript}"
 

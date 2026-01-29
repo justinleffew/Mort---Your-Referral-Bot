@@ -115,3 +115,24 @@
   - Gotchas
     - None observed.
 ---
+## 2026-01-29 05:30 - ADHOC-VOICE-CONTACTS
+- What was implemented
+  - Fixed brain dump and follow-up AI calls to target the mort-openai/mort-openai-tts edge functions, updated follow-up prompting, and softened fallback copy to be conversational.
+  - Added silence-based auto-stop for Commute Mode recordings, removed the manual finalize button, and defaulted voice playback to Nova.
+  - Hardened brain dump contact creation by parsing valid years before writing sale dates.
+- Files changed
+  - services/openaiService.ts
+  - components/CommuteMode.tsx
+  - services/dataService.ts
+- Assumptions made (if any)
+  - The correct edge function names for OpenAI and TTS are mort-openai and mort-openai-tts based on the Supabase function directory.
+  - Brain dump sale dates should only be stored when a valid 4-digit year is present to avoid insert errors.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Commute Mode uses speech transcript changes to trigger conversational follow-ups, so silence-based recording stops should feed that same pipeline.
+  - Gotchas
+    - None observed.
+---
