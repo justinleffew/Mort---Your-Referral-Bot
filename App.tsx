@@ -272,19 +272,25 @@ const Dashboard: React.FC = () => {
   const handleRunNow = async () => {
     setRunNowLoading(true);
     setRunNowError(null);
-    const opportunities = await dataService.runNowOpportunities();
-    setRunNowOpportunities(opportunities);
-    const defaults: Record<string, string> = {};
-    opportunities.forEach(opportunity => {
-      if (opportunity.suggested_messages?.length) {
-        defaults[opportunity.id] = opportunity.suggested_messages[0];
+    try {
+      const opportunities = await dataService.runNowOpportunities();
+      setRunNowOpportunities(opportunities);
+      const defaults: Record<string, string> = {};
+      opportunities.forEach(opportunity => {
+        if (opportunity.suggested_messages?.length) {
+          defaults[opportunity.id] = opportunity.suggested_messages[0];
+        }
+      });
+      setSelectedMessages(defaults);
+      if (opportunities.length === 0) {
+        setRunNowError('No opportunities yet. Add more contacts.');
       }
-    });
-    setSelectedMessages(defaults);
-    if (opportunities.length === 0) {
-      setRunNowError('No opportunities yet. Add more contacts.');
+    } catch (error) {
+      console.warn('Run Now failed', error);
+      setRunNowError('Run Now failed. Please retry.');
+    } finally {
+      setRunNowLoading(false);
     }
-    setRunNowLoading(false);
   };
 
   const handleCopyMessage = async (message: string) => {
@@ -293,15 +299,28 @@ const Dashboard: React.FC = () => {
   };
 
   const handleMarkContacted = async (contactId: string, message: string) => {
-    await dataService.addTouch(contactId, 'reach_out', { channel: 'sms', body: message, source: 'run_now' });
+    setRunNowError(null);
+    try {
+      await dataService.addTouch(contactId, 'reach_out', { channel: 'sms', body: message, source: 'run_now' });
+    } catch (error) {
+      console.warn('Failed to save touch', error);
+      setRunNowError('Save failed. Please retry.');
+    }
   };
 
   const handleSeedSampleContacts = async () => {
     setSampleSeeding(true);
-    await dataService.seedSampleContacts();
-    setSampleSeeding(false);
-    setSampleSeeded(dataService.hasSeededSampleContacts());
-    await refreshRadar();
+    setRunNowError(null);
+    try {
+      await dataService.seedSampleContacts();
+      setSampleSeeded(dataService.hasSeededSampleContacts());
+      await refreshRadar();
+    } catch (error) {
+      console.warn('Failed to seed sample contacts', error);
+      setRunNowError('Sample data failed. Please retry.');
+    } finally {
+      setSampleSeeding(false);
+    }
   };
 
   return (
@@ -573,6 +592,7 @@ const DailyActions: React.FC = () => {
   const [referralName, setReferralName] = useState('');
   const [referralStage, setReferralStage] = useState<ReferralStage>('intro');
   const [referralSaving, setReferralSaving] = useState(false);
+  const [referralError, setReferralError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -620,17 +640,24 @@ const DailyActions: React.FC = () => {
   const handleAddReferral = async () => {
     const trimmedName = referralName.trim();
     if (!referralContactId || !trimmedName) return;
+    setReferralError(null);
     setReferralSaving(true);
-    await dataService.addReferralEvent({
-      sourceContactId: referralContactId,
-      referredName: trimmedName,
-      stage: referralStage,
-    });
-    setReferralName('');
-    setReferralStage('intro');
-    setShowReferralModal(false);
-    setReferralSaving(false);
-    await loadData();
+    try {
+      await dataService.addReferralEvent({
+        sourceContactId: referralContactId,
+        referredName: trimmedName,
+        stage: referralStage,
+      });
+      setReferralName('');
+      setReferralStage('intro');
+      setShowReferralModal(false);
+      await loadData();
+    } catch (error) {
+      console.warn('Failed to add referral', error);
+      setReferralError('Referral save failed. Please retry.');
+    } finally {
+      setReferralSaving(false);
+    }
   };
 
   if (loading) {
@@ -769,6 +796,9 @@ const DailyActions: React.FC = () => {
               >
                 Cancel
               </button>
+              {referralError && (
+                <span className="text-[10px] font-semibold text-amber-600">{referralError}</span>
+              )}
               <button
                 type="button"
                 onClick={handleAddReferral}
@@ -805,6 +835,7 @@ const ContactDetail: React.FC = () => {
     const [profileCadenceDays, setProfileCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
     const [cadenceSelection, setCadenceSelection] = useState<number>(DEFAULT_CADENCE_DAYS);
     const [customCadence, setCustomCadence] = useState<string>('');
+    const [activityError, setActivityError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!id) return;
@@ -857,20 +888,38 @@ const ContactDetail: React.FC = () => {
     );
 
     const logTouch = async (type: TouchType) => {
-        await dataService.addTouch(contact.id, type, { source: 'manual' });
-        await refreshActivity(contact.id);
+        setActivityError(null);
+        try {
+            await dataService.addTouch(contact.id, type, { source: 'manual' });
+            await refreshActivity(contact.id);
+        } catch (error) {
+            console.warn('Failed to save touch', error);
+            setActivityError('Save failed. Please retry.');
+        }
     };
 
     const handleCadenceUpdate = async (nextDays: number, mode: 'AUTO' | 'MANUAL') => {
         const sanitizedDays = Math.max(1, Math.round(nextDays));
-        await dataService.updateContact(contact.id, { cadence_days: sanitizedDays, cadence_mode: mode });
-        setContact(prev => (prev ? { ...prev, cadence_days: sanitizedDays, cadence_mode: mode } : prev));
-        setCadenceSelection(sanitizedDays);
+        setActivityError(null);
+        try {
+            await dataService.updateContact(contact.id, { cadence_days: sanitizedDays, cadence_mode: mode });
+            setContact(prev => (prev ? { ...prev, cadence_days: sanitizedDays, cadence_mode: mode } : prev));
+            setCadenceSelection(sanitizedDays);
+        } catch (error) {
+            console.warn('Failed to update cadence', error);
+            setActivityError('Update failed. Please retry.');
+        }
     };
 
     const toggleContactFlag = async (field: 'safe_mode' | 'do_not_contact', value: boolean) => {
-        await dataService.updateContact(contact.id, { [field]: value } as Partial<Contact>);
-        setContact(prev => (prev ? { ...prev, [field]: value } : prev));
+        setActivityError(null);
+        try {
+            await dataService.updateContact(contact.id, { [field]: value } as Partial<Contact>);
+            setContact(prev => (prev ? { ...prev, [field]: value } : prev));
+        } catch (error) {
+            console.warn('Failed to update contact flag', error);
+            setActivityError('Update failed. Please retry.');
+        }
     };
 
     const refreshActivity = async (contactId: string) => {
@@ -891,29 +940,47 @@ const ContactDetail: React.FC = () => {
     const handleAddNote = async () => {
         const trimmed = noteDraft.trim();
         if (!trimmed) return;
-        await dataService.addNote(contact.id, trimmed);
-        setNoteDraft('');
-        await refreshActivity(contact.id);
+        setActivityError(null);
+        try {
+            await dataService.addNote(contact.id, trimmed);
+            setNoteDraft('');
+            await refreshActivity(contact.id);
+        } catch (error) {
+            console.warn('Failed to add note', error);
+            setActivityError('Note save failed. Please retry.');
+        }
     };
 
     const handleAddReferral = async () => {
         const trimmedName = referralName.trim();
         if (!trimmedName) return;
-        await dataService.addReferralEvent({
-            sourceContactId: contact.id,
-            referredName: trimmedName,
-            stage: referralStage,
-            notes: referralNotes.trim() || undefined,
-        });
-        setReferralName('');
-        setReferralStage('intro');
-        setReferralNotes('');
-        await refreshActivity(contact.id);
+        setActivityError(null);
+        try {
+            await dataService.addReferralEvent({
+                sourceContactId: contact.id,
+                referredName: trimmedName,
+                stage: referralStage,
+                notes: referralNotes.trim() || undefined,
+            });
+            setReferralName('');
+            setReferralStage('intro');
+            setReferralNotes('');
+            await refreshActivity(contact.id);
+        } catch (error) {
+            console.warn('Failed to add referral', error);
+            setActivityError('Referral save failed. Please retry.');
+        }
     };
 
     const handleUpdateReferral = async (eventId: string, updates: Partial<ReferralEvent>) => {
-        await dataService.updateReferralEvent(eventId, updates);
-        await refreshActivity(contact.id);
+        setActivityError(null);
+        try {
+            await dataService.updateReferralEvent(eventId, updates);
+            await refreshActivity(contact.id);
+        } catch (error) {
+            console.warn('Failed to update referral', error);
+            setActivityError('Referral update failed. Please retry.');
+        }
     };
 
     const timelineItems = [
@@ -943,6 +1010,11 @@ const ContactDetail: React.FC = () => {
                     Edit
                 </button>
             </div>
+            {activityError && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
+                    {activityError}
+                </div>
+            )}
 
             <div className="text-center space-y-4 mb-8">
                 <div className="w-24 h-24 bg-primary rounded-[2rem] flex items-center justify-center text-white font-black text-4xl mx-auto border border-border shadow-2xl">
@@ -1272,6 +1344,7 @@ const EditContact: React.FC = () => {
     const [lastName, setLastName] = useState('');
     const [aboutDraft, setAboutDraft] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const primaryTagOptions = [
         'Past Client',
         'Friend',
@@ -1331,6 +1404,8 @@ const EditContact: React.FC = () => {
             alert("Name is required");
             return;
         }
+
+        setSaveError(null);
         
         const finalContact = {
             ...contact,
@@ -1341,18 +1416,23 @@ const EditContact: React.FC = () => {
 
         const trimmedAbout = aboutDraft.trim();
 
-        if (isEditing && id) {
-            await dataService.updateContact(id, finalContact);
-            if (trimmedAbout) {
-                await dataService.addNote(id, trimmedAbout);
+        try {
+            if (isEditing && id) {
+                await dataService.updateContact(id, finalContact);
+                if (trimmedAbout) {
+                    await dataService.addNote(id, trimmedAbout);
+                }
+            } else {
+                const savedContact = await dataService.addContact(finalContact);
+                if (trimmedAbout) {
+                    await dataService.addNote(savedContact.id, trimmedAbout);
+                }
             }
-        } else {
-            const savedContact = await dataService.addContact(finalContact);
-            if (trimmedAbout) {
-                await dataService.addNote(savedContact.id, trimmedAbout);
-            }
+            navigate('/contacts');
+        } catch (error) {
+            console.warn('Failed to save contact', error);
+            setSaveError('Save failed. Please retry.');
         }
-        navigate('/contacts');
     };
 
     const InputStyle = "w-full bg-muted border border-border rounded-xl p-4 text-foreground font-bold outline-none transition-all focus:ring-2 focus:ring-primary appearance-none";
@@ -1477,6 +1557,11 @@ const EditContact: React.FC = () => {
                         </div>
                     </div>
                 </div>
+                {saveError && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
+                        {saveError}
+                    </div>
+                )}
                 <button 
                     onClick={handleSave}
                     className="w-full bg-primary text-white font-black uppercase tracking-[0.2em] py-5 rounded-2xl transition-all shadow-xl active:scale-95 mt-4"
@@ -1662,6 +1747,7 @@ const ContactsList: React.FC = () => {
 
 const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignOut }) => {
     const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     useEffect(() => {
         void (async () => {
@@ -1671,8 +1757,14 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
     }, []);
 
     const save = async () => {
-        await dataService.saveProfile(profile);
-        alert('Settings Saved');
+        setSaveError(null);
+        try {
+            await dataService.saveProfile(profile);
+            alert('Settings Saved');
+        } catch (error) {
+            console.warn('Failed to save settings', error);
+            setSaveError('Save failed. Please retry.');
+        }
     };
 
     const handleReset = () => {
@@ -1774,6 +1866,11 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
                    <p className="text-xs text-muted-foreground leading-relaxed">
                         AI requests are handled through the app account. There is no user-facing API key to manage.
                    </p>
+                   {saveError && (
+                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
+                       {saveError}
+                     </div>
+                   )}
                    <button onClick={save} className="w-full bg-primary text-white font-black uppercase text-xs py-4 rounded-xl">Save Preferences</button>
                 </section>
                 <section className="bg-surface border border-border p-8 rounded-[2.5rem] space-y-4">

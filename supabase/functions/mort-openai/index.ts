@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
+import { corsHeaders, handleOptions } from '../_shared/cors.ts';
 
 const OPENAI_MODEL = 'gpt-4o-mini';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
@@ -7,48 +8,15 @@ const getOpenAiKey = () =>
   Deno.env.get('OPENAI_SECRET_KEY') ??
   Deno.env.get('OPENAI_API_KEY');
 
-const corsHeaders = (req: Request) => {
-  const origin = req.headers.get('origin');
-  let allowOrigin = '';
-
-  if (origin) {
-    try {
-      const url = new URL(origin);
-      const hostname = url.hostname;
-      const isVercel = hostname.endsWith('.vercel.app');
-      const isLocalhost = hostname === 'localhost';
-
-      if (isVercel || isLocalhost) {
-        allowOrigin = origin;
-      }
-    } catch {
-      // Ignore invalid origin values.
-    }
-  }
-
-  const headers: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    Vary: 'Origin',
-  };
-
-  if (allowOrigin) {
-    headers['Access-Control-Allow-Origin'] = allowOrigin;
-  }
-
-  return headers;
-};
-
 Deno.serve(async req => {
-  const baseHeaders = corsHeaders(req);
-  console.log('mort-openai request', {
-    method: req.method,
-    origin: req.headers.get('origin'),
-  });
+  const origin = req.headers.get('origin');
+  const baseHeaders = corsHeaders(origin);
+  console.log('mort-openai request', { method: req.method, origin });
   const authHeader = req.headers.get('authorization');
 
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: baseHeaders });
+  const optionsResponse = handleOptions(req);
+  if (optionsResponse) {
+    return optionsResponse;
   }
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -60,6 +28,7 @@ Deno.serve(async req => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceRoleKey) {
+    console.log('mort-openai missing configuration');
     return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
       status: 500,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -72,6 +41,7 @@ Deno.serve(async req => {
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
+    console.log('mort-openai unauthorized', { authError });
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -80,6 +50,7 @@ Deno.serve(async req => {
 
   const openAiKey = getOpenAiKey();
   if (!openAiKey) {
+    console.log('mort-openai missing OpenAI key');
     return new Response(JSON.stringify({ error: 'OpenAI key missing' }), {
       status: 500,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -90,6 +61,7 @@ Deno.serve(async req => {
   try {
     payload = await req.json();
   } catch {
+    console.log('mort-openai invalid payload');
     return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
       status: 400,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -98,6 +70,7 @@ Deno.serve(async req => {
 
   const prompt = typeof payload.prompt === 'string' ? payload.prompt.trim() : '';
   if (!prompt) {
+    console.log('mort-openai missing prompt');
     return new Response(JSON.stringify({ error: 'Prompt required' }), {
       status: 400,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -119,6 +92,7 @@ Deno.serve(async req => {
     });
 
     if (!response.ok) {
+      console.log('mort-openai request failed', { status: response.status });
       return new Response(JSON.stringify({ error: 'OpenAI request failed' }), {
         status: 500,
         headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -131,6 +105,7 @@ Deno.serve(async req => {
     try {
       parsed = JSON.parse(content);
     } catch {
+      console.log('mort-openai invalid response payload');
       return new Response(JSON.stringify({ error: 'Invalid OpenAI response' }), {
         status: 500,
         headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -141,7 +116,8 @@ Deno.serve(async req => {
       status: 200,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
-  } catch {
+  } catch (error) {
+    console.log('mort-openai request error', { error });
     return new Response(JSON.stringify({ error: 'OpenAI request failed' }), {
       status: 500,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
