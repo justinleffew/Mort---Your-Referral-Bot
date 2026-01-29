@@ -122,6 +122,14 @@ export interface GeneratedMessage {
   angle: RadarAngle;
 }
 
+export interface NewsEvent {
+  title: string;
+  url: string;
+  source: string;
+  published_at: string;
+  relevance: string;
+}
+
 export type ReferralStage = 'intro' | 'engaged' | 'showing' | 'under_contract' | 'closed' | 'lost';
 
 export type ReferralStatus = 'active' | 'won' | 'lost';

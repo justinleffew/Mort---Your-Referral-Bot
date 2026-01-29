@@ -68,7 +68,7 @@ const loadObject = <T>(key: string): T | null => {
       }
       return (parsed as VersionedPayload<T>).data ?? null;
     }
-    return parsed ?? null;
+    return (parsed as T) ?? null;
   } catch (error) {
     console.warn(`Failed to parse storage data for key "${key}".`, error);
     return null;
@@ -476,7 +476,8 @@ export const dataService = {
 
     if (supabase && userId) {
       // Supabase mode.
-      const supabasePayload = buildSupabaseContactInsertPayload(buildContact(userId));
+      const fallbackContact = buildContact(userId);
+      const supabasePayload = buildSupabaseContactInsertPayload(fallbackContact);
       const { data: inserted, error } = await supabase
         .from('contacts')
         .insert(supabasePayload)
@@ -484,7 +485,7 @@ export const dataService = {
         .single();
       if (error) {
         console.warn('Failed to add contact', error);
-        return supabasePayload;
+        return fallbackContact;
       }
       await supabase.from('radar_state').upsert(
         {
