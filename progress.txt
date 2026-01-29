@@ -95,3 +95,23 @@
   - Gotchas
     - Playwright screenshot attempt failed due to a Chromium crash in the container.
 ---
+## 2026-01-29 04:09 - US-003
+- What was implemented
+  - Added fallback "Why now" reasoning to avoid error text for friendly check-ins and other radar angles.
+  - Removed pulsing animation from the radar loading card and lightened the placeholder styling.
+- Files changed
+  - services/openaiService.ts
+  - components/RadarCard.tsx
+- Assumptions made (if any)
+  - Interpreted the "Why now" error as missing/failed AI reasoning and provided deterministic fallbacks per radar angle.
+  - Interpreted the "blinking contact" as the radar card loading skeleton pulse.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+  - Skipped lint/tests (no scripts in package.json)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Provide deterministic fallback strings for AI-derived UI fields to avoid "Error" placeholders.
+  - Gotchas
+    - None observed.
+---

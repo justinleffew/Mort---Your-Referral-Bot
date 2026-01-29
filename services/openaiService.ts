@@ -120,6 +120,14 @@ export const generateRadarMessage = async (
         light_value_framing: `Hi ${firstName}, seeing some interesting shifts in the market lately and thought of you. Hope you're doing well!`,
         equity_opportunity: `Hi ${firstName}, was looking at some data for ${contact.location_context || 'your area'} and thought of you. Hope things are great!`
     };
+    const reasonFallbacks: Record<RadarAngle, string> = {
+        friendly_checkin: 'No new triggers surfaced, so a friendly check-in keeps the relationship warm.',
+        interest_based: 'A recent interest match makes this a natural, personal moment to reach out.',
+        time_since_contact: 'It has been a while since the last touch, so a quick hello feels timely.',
+        homeownership_milestone: 'A homeownership milestone is a natural excuse to check in.',
+        light_value_framing: 'A light market pulse gives you a simple, low-pressure reason to reach out.',
+        equity_opportunity: 'Equity trends suggest a helpful check-in could be relevant right now.',
+    };
 
     try {
         const prompt = `
@@ -148,16 +156,18 @@ export const generateRadarMessage = async (
         `;
 
         const json = await callOpenAiJson<{ message?: string; reason?: string }>(prompt);
+        const message = json.message?.trim() || fallbacks[angle];
+        const reason = json.reason?.trim() || reasonFallbacks[angle];
         return {
-            message: json.message || fallbacks[angle],
-            reason: json.reason || "Generated from context",
+            message,
+            reason,
             angle
         };
     } catch (e) {
         if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
-            return { message: e.message, reason: "Authentication required", angle };
+            return { message: e.message, reason: reasonFallbacks[angle], angle };
         }
-        return { message: fallbacks[angle], reason: "Error", angle };
+        return { message: fallbacks[angle], reason: reasonFallbacks[angle], angle };
     }
 };
 
