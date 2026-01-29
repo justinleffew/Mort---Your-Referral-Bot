@@ -109,9 +109,9 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
 
     if (loading) {
         return (
-            <div className="bg-slate-800/40 border border-white/5 rounded-3xl p-6 h-64 animate-pulse">
-                <div className="h-6 bg-slate-700/50 rounded-full w-1/2 mb-4"></div>
-                <div className="h-32 bg-slate-700/30 rounded-2xl mb-4"></div>
+            <div className="bg-slate-800/60 border border-white/10 rounded-3xl p-6 h-64 shadow-xl">
+                <div className="h-6 bg-slate-700/40 rounded-full w-1/2 mb-4"></div>
+                <div className="h-32 bg-slate-700/25 rounded-2xl mb-4"></div>
             </div>
         );
     }
