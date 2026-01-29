@@ -136,3 +136,37 @@
   - Gotchas
     - None observed.
 ---
+## 2026-01-29 04:45 - ADHOC-CORS-EDGE-FUNCTIONS
+- What was implemented
+  - Added per-function CORS helpers with origin allowlists, preflight handling, and minimal request logging for mort-openai and mort-openai-tts.
+- Files changed
+  - supabase/functions/mort-openai/index.ts
+  - supabase/functions/mort-openai-tts/index.ts
+- Assumptions made (if any)
+  - Treated "localhost" as any http(s) origin whose hostname is exactly localhost and "*.vercel.app" as any origin whose hostname ends with .vercel.app.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None observed.
+---
+## 2026-01-29 04:56 - ADHOC-CORS-EDGE-FUNCTIONS
+- What was implemented
+  - Removed heydad-specific CORS origin checks and limited CORS allowlist to localhost and *.vercel.app origins in mort-openai and mort-openai-tts.
+- Files changed
+  - supabase/functions/mort-openai/index.ts
+  - supabase/functions/mort-openai-tts/index.ts
+- Assumptions made (if any)
+  - Assumed Mort only needs localhost and Vercel preview/production origins for browser access at this time.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None observed.
+---
