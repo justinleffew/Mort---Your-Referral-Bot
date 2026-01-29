@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
 import { invokeEdgeFunction } from './edgeFunctions';
+import { EDGE_FUNCTIONS } from './edgeFunctionConfig';
 
 const STORAGE_KEYS = {
   CONTACTS: 'mort_contacts',
@@ -1032,7 +1033,7 @@ export const dataService = {
         return [];
       }
       const data = await invokeEdgeFunction<{ opportunities?: Opportunity[] }, { exclude_do_not_contact: boolean }>({
-        functionName: 'mort-run-now',
+        functionName: EDGE_FUNCTIONS.RUN_NOW,
         body: { exclude_do_not_contact: true },
       });
       if (data && Array.isArray(data.opportunities)) {

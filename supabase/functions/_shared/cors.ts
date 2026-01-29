@@ -1,6 +1,17 @@
-const ALLOWED_ORIGINS = new Set([
-  'https://mort-your-referral-bot.vercel.app',
-]);
+const DEFAULT_PRODUCTION_ORIGINS = ['https://mort-your-referral-bot.vercel.app'];
+
+const parseOrigins = (raw: string | undefined) =>
+  (raw ?? '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+const envOrigins = [
+  ...parseOrigins(Deno.env.get('MORT_PRODUCTION_ORIGINS')),
+  ...parseOrigins(Deno.env.get('MORT_PRODUCTION_ORIGIN')),
+];
+
+const ALLOWED_ORIGINS = new Set([...DEFAULT_PRODUCTION_ORIGINS, ...envOrigins]);
 
 const isAllowedOrigin = (origin: string | null) => {
   if (!origin) return false;
