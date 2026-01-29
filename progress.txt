@@ -196,3 +196,22 @@
   - Gotchas
     - Screenshot capture is limited without an authenticated Supabase session.
 ---
+## 2026-01-29 17:49 - ADHOC-CONTACTS-CLEANUP
+- What was implemented
+  - Removed the Contacts screen Segment and Tags filters, keeping only the functional Next touch and Sort controls.
+  - Removed the MORT wordmark text from the app header and auth header, leaving the icon-only branding.
+- Files changed
+  - App.tsx
+- Assumptions made (if any)
+  - Treated the request as an ad-hoc UI cleanup not mapped to an existing PRD story, so prd.json remains unchanged.
+  - Removed the header wordmark in both authenticated and auth layouts to keep branding consistent.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+  - Skipped lint/tests (no scripts in package.json).
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None observed.
+---
