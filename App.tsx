@@ -1491,8 +1491,6 @@ const EditContact: React.FC = () => {
 const ContactsList: React.FC = () => {
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [segmentFilter, setSegmentFilter] = useState('');
-    const [tagsFilterInput, setTagsFilterInput] = useState('');
     const [nextTouchFilter, setNextTouchFilter] = useState<'all' | 'due' | 'upcoming'>('all');
     const [sortMode, setSortMode] = useState<'name' | 'next-touch'>('name');
     const [showAddMenu, setShowAddMenu] = useState(false);
@@ -1506,14 +1504,6 @@ const ContactsList: React.FC = () => {
     useEffect(() => {
         void refreshContacts();
     }, []);
-
-    const availableSegments = Array.from(
-        new Set<string>(contacts.map(c => c.segment).filter((segment): segment is string => Boolean(segment)))
-    ).sort((a, b) => a.localeCompare(b));
-    const tagFilters = tagsFilterInput
-        .split(',')
-        .map(tag => tag.trim().toLowerCase())
-        .filter(tag => tag.length > 0);
 
     const contactEntries = contacts.map(contact => {
         const nextTouchDate = getNextTouchDate(contact);
@@ -1532,12 +1522,6 @@ const ContactsList: React.FC = () => {
                 contact.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 contact.email?.toLowerCase().includes(searchTerm.toLowerCase());
             if (!matchesSearch) return false;
-            if (segmentFilter && (contact.segment || '').toLowerCase() !== segmentFilter.toLowerCase()) return false;
-            if (tagFilters.length > 0) {
-                const contactTags = (contact.tags || []).map(tag => tag.toLowerCase());
-                const hasMatchingTag = tagFilters.some(tag => contactTags.includes(tag));
-                if (!hasMatchingTag) return false;
-            }
             return true;
         })
         .filter(({ nextTouchStatus }) => {
@@ -1602,30 +1586,7 @@ const ContactsList: React.FC = () => {
                 </div>
             </div>
             <input type="text" placeholder="Search contacts..." className="bg-muted border border-border rounded-2xl px-6 py-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none w-full mb-6" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Segment</label>
-                    <select
-                        className="bg-muted border border-border rounded-2xl px-6 py-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none w-full"
-                        value={segmentFilter}
-                        onChange={e => setSegmentFilter(e.target.value)}
-                    >
-                        <option value="">All segments</option>
-                        {availableSegments.map(segment => (
-                            <option key={segment} value={segment}>{segment}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Tags</label>
-                    <input
-                        type="text"
-                        placeholder="Filter by tag (comma separated)"
-                        className="bg-muted border border-border rounded-2xl px-6 py-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none w-full"
-                        value={tagsFilterInput}
-                        onChange={e => setTagsFilterInput(e.target.value)}
-                    />
-                </div>
+            <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2">
                 <div>
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Next touch</label>
                     <select
@@ -1849,7 +1810,6 @@ const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
             <header className="px-8 py-6 flex items-center justify-between max-w-2xl mx-auto">
                 <Link to="/" className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
-                    <span className="text-2xl font-black text-foreground italic tracking-tighter">MORT</span>
                 </Link>
                 <Link
                     to="/commute"
@@ -1875,7 +1835,6 @@ const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <header className="px-8 py-8 flex items-center justify-center">
                 <Link to="/" className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
-                    <span className="text-2xl font-black text-foreground italic tracking-tighter">MORT</span>
                 </Link>
             </header>
             <main className="relative flex-1 flex items-center justify-center px-6">
