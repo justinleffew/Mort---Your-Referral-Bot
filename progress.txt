@@ -170,3 +170,29 @@
   - Gotchas
     - None observed.
 ---
+## 2026-01-29 16:23 - ADHOC-UI-ACCESSIBILITY
+- What was implemented
+  - Added light-mode theme tokens via CSS variables and Tailwind colors, raised base font size, and updated the app shell to use semantic colors.
+  - Replaced user-facing schema terms through a central UI_LABELS mapping, refreshed navigation labels, added a dashboard voice FAB and header Add action, and moved sign out into Settings.
+  - Made Daily Actions focus cards fully clickable, added an active referrals empty-state CTA with an inline referral modal, and elevated script output with copy actions.
+- Files changed
+  - App.tsx
+  - components/RadarCard.tsx
+  - components/MortgageAssist.tsx
+  - components/CommuteMode.tsx
+  - components/AuthPanel.tsx
+  - index.css
+  - tailwind.config.cjs
+  - utils/uiLabels.ts
+- Assumptions made (if any)
+  - Treated the Daily Actions referral modal as the direct Add Referral flow for the empty-state CTA.
+  - Used system prefers-color-scheme for optional dark mode instead of adding a user toggle.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Centralized UI_LABELS is the safest way to swap user-facing schema labels.
+  - Gotchas
+    - Screenshot capture is limited without an authenticated Supabase session.
+---
