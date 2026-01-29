@@ -111,6 +111,14 @@ const disableProfileSync = (error: { message?: string; code?: string; details?: 
   }
 };
 
+const formatSupabaseError = (
+  action: string,
+  error?: { message?: string; details?: string; hint?: string; code?: string; status?: number }
+) => {
+  const details = [error?.message, error?.details, error?.hint].filter(Boolean).join(' ');
+  return details ? `Unable to ${action}. ${details}` : `Unable to ${action}.`;
+};
+
 const resolveCadenceDays = (profile?: RealtorProfile) => {
   const cadenceType = profile?.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type;
   if (cadenceType === 'weekly') return 7;
@@ -393,6 +401,7 @@ export const dataService = {
       if (error) {
         console.warn('Failed to save profile', error);
         disableProfileSync(error);
+        throw new Error(formatSupabaseError('save profile', error));
       } else {
         cachedProfile = withProfileDefaults({
           ...profile,
@@ -491,7 +500,7 @@ export const dataService = {
         .single();
       if (error) {
         console.warn('Failed to add contact', error);
-        return fallbackContact;
+        throw new Error(formatSupabaseError('add contact', error));
       }
       await supabase.from('radar_state').upsert(
         {
@@ -552,6 +561,7 @@ export const dataService = {
         .eq('user_id', userId);
       if (error) {
         console.warn('Failed to update contact', error);
+        throw new Error(formatSupabaseError('update contact', error));
       }
       return;
     }
@@ -605,6 +615,7 @@ export const dataService = {
       });
       if (error) {
         console.warn('Failed to add note', error);
+        throw new Error(formatSupabaseError('add note', error));
       }
       if (parsedInterests.length > 0) {
         const contact = await dataService.getContactById(contactId);
@@ -805,6 +816,7 @@ export const dataService = {
       const { error } = await supabase.from('touches').insert(touch);
       if (error) {
         console.warn('Failed to add touch', error);
+        throw new Error(formatSupabaseError('add touch', error));
       }
       await supabase
         .from('contacts')
@@ -874,7 +886,7 @@ export const dataService = {
         .single();
       if (error) {
         console.warn('Failed to add referral event', error);
-        return referral;
+        throw new Error(formatSupabaseError('add referral event', error));
       }
       return normalizeReferralEvent(inserted);
     }
@@ -900,6 +912,7 @@ export const dataService = {
         .eq('user_id', userId);
       if (error) {
         console.warn('Failed to update referral event', error);
+        throw new Error(formatSupabaseError('update referral event', error));
       }
       return;
     }

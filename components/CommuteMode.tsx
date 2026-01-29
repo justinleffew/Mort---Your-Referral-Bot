@@ -23,6 +23,7 @@ const CommuteMode: React.FC = () => {
     const [voiceAuthMessage, setVoiceAuthMessage] = useState('');
     const [isTtsLoading, setIsTtsLoading] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState('');
     const recognitionRef = useRef<any>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const followUpTimeoutRef = useRef<number | null>(null);
@@ -277,11 +278,18 @@ const CommuteMode: React.FC = () => {
     const handleProcess = async () => {
         const combinedTranscript = conversationTranscript.trim() || transcript.trim();
         if (!combinedTranscript) return;
+        setSaveError('');
         setIsProcessing(true);
-        const clients = await processBrainDump(combinedTranscript);
-        await dataService.addBrainDumpClients(clients);
-        setIsProcessing(false);
-        navigate('/');
+        try {
+            const clients = await processBrainDump(combinedTranscript);
+            await dataService.addBrainDumpClients(clients);
+            navigate('/');
+        } catch (error) {
+            console.error('Failed to save brain dump', error);
+            setSaveError('Save failed. Please retry.');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     useEffect(() => {
@@ -429,6 +437,11 @@ const CommuteMode: React.FC = () => {
 
             {/* Action Bar */}
             <div className="w-full pb-8 flex flex-col gap-4">
+                {saveError && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700 text-center">
+                        {saveError}
+                    </div>
+                )}
                 <button 
                     disabled={!transcript || isProcessing}
                     onClick={handleProcess}

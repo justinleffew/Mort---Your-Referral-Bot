@@ -162,6 +162,7 @@ Deno.serve(async req => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceRoleKey) {
+    console.log('mort-run-now missing configuration');
     return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
       status: 500,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -174,6 +175,7 @@ Deno.serve(async req => {
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
+    console.log('mort-run-now unauthorized', { authError });
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -195,6 +197,7 @@ Deno.serve(async req => {
   });
 
   if (candidatesError) {
+    console.log('mort-run-now failed to load candidates', { candidatesError });
     return new Response(JSON.stringify({ error: 'Failed to load candidates' }), {
       status: 500,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -271,6 +274,7 @@ Deno.serve(async req => {
     .select('*');
 
   if (insertError) {
+    console.log('mort-run-now failed to insert opportunities', { insertError });
     return new Response(JSON.stringify({ error: 'Failed to insert opportunities' }), {
       status: 500,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },

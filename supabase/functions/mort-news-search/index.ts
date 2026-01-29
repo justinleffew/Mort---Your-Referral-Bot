@@ -29,6 +29,7 @@ Deno.serve(async req => {
   const origin = req.headers.get('origin');
   const baseHeaders = corsHeaders(origin);
   const authHeader = req.headers.get('authorization');
+  console.log('mort-news-search request', { method: req.method, origin });
 
   const optionsResponse = handleOptions(req);
   if (optionsResponse) {
@@ -44,6 +45,7 @@ Deno.serve(async req => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceRoleKey) {
+    console.log('mort-news-search missing configuration');
     return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
       status: 500,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -56,6 +58,7 @@ Deno.serve(async req => {
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
+    console.log('mort-news-search unauthorized', { authError });
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -66,6 +69,7 @@ Deno.serve(async req => {
   try {
     payload = await req.json();
   } catch {
+    console.log('mort-news-search invalid payload');
     return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
       status: 400,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -95,6 +99,7 @@ Deno.serve(async req => {
   try {
     const response = await fetch(`${GDELT_BASE}?${params.toString()}`);
     if (!response.ok) {
+      console.log('mort-news-search request failed', { status: response.status });
       return new Response(JSON.stringify({ events: [] }), {
         status: 200,
         headers: { ...baseHeaders, 'Content-Type': 'application/json' },
@@ -121,7 +126,8 @@ Deno.serve(async req => {
       status: 200,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },
     });
-  } catch {
+  } catch (error) {
+    console.log('mort-news-search request error', { error });
     return new Response(JSON.stringify({ events: [] }), {
       status: 200,
       headers: { ...baseHeaders, 'Content-Type': 'application/json' },

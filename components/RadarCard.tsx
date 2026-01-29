@@ -20,6 +20,7 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
     const [isEditing, setIsEditing] = useState(false);
     const [copied, setCopied] = useState(false);
     const [copyError, setCopyError] = useState<string | null>(null);
+    const [touchError, setTouchError] = useState<string | null>(null);
     const messageRef = useRef<HTMLTextAreaElement | null>(null);
     const nextTouchDate = getNextTouchDate(contact);
     const nextTouchStatus = getNextTouchStatus(nextTouchDate);
@@ -80,11 +81,19 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
     };
 
     const logTouch = async (type: TouchType) => {
-        await dataService.addTouch(contact.id, type, {
-            channel: 'sms',
-            body: editedMessage,
-            source: 'radar',
-        });
+        setTouchError(null);
+        try {
+            await dataService.addTouch(contact.id, type, {
+                channel: 'sms',
+                body: editedMessage,
+                source: 'radar',
+            });
+            return true;
+        } catch (error) {
+            console.warn('Failed to log touch', error);
+            setTouchError('Save failed. Please retry.');
+            return false;
+        }
     };
 
     const handleCopy = async () => {
@@ -103,7 +112,8 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
     };
 
     const handleSent = async () => {
-        await logTouch('text');
+        const saved = await logTouch('text');
+        if (!saved) return;
         onReachedOut();
     };
 
@@ -211,6 +221,11 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                 {copyError && (
                     <p className="mt-2 text-xs font-semibold text-amber-600">
                         {copyError}
+                    </p>
+                )}
+                {touchError && (
+                    <p className="mt-2 text-xs font-semibold text-amber-600">
+                        {touchError}
                     </p>
                 )}
             </div>
