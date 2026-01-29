@@ -335,6 +335,12 @@ const extractRadarInterestsFromText = (text: string) => {
   return Array.from(new Set(interests));
 };
 
+const parseApproxYear = (value?: string | null) => {
+  if (!value) return null;
+  const match = String(value).match(/\b(19|20)\d{2}\b/);
+  return match ? match[0] : null;
+};
+
 export const dataService = {
   initAuthProfile: async () => {
     const supabase = getSupabaseClient();
@@ -516,10 +522,11 @@ export const dataService = {
 
   addBrainDumpClients: async (clients: BrainDumpClient[]) => {
     for (const c of clients) {
+      const parsedYear = parseApproxYear(c.transaction_history?.approx_year);
       const contact = await dataService.addContact({
         full_name: c.names.join(' & '),
         location_context: c.location_context,
-        sale_date: c.transaction_history.approx_year ? `${c.transaction_history.approx_year}-01-01` : undefined,
+        sale_date: parsedYear ? `${parsedYear}-01-01` : undefined,
         radar_interests: c.radar_interests,
         family_details: c.family_details,
         mortgage_inference: c.mortgage_inference,
