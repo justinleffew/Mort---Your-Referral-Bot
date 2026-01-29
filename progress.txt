@@ -75,3 +75,23 @@
   - Gotchas
     - None observed.
 ---
+## 2026-01-29 03:48 - US-003
+- What was implemented
+  - Removed import-contacts UI and CSV/Google modal from radar and contacts screens.
+  - Collapsed copy-ready scripts into a modal launched from a single button.
+  - Removed the calculator route/nav entry and simplified Mort chat to just the input/response flow.
+- Files changed
+  - App.tsx
+  - components/MortgageAssist.tsx
+- Assumptions made (if any)
+  - Interpreted the request to remove CSV/Google imports as removing the UI entry points while keeping the underlying bulk import helper intact.
+  - Removed the standalone calculator screen and navigation entry without touching mortgage chat behavior.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - Playwright screenshot attempt failed due to a Chromium crash in the container.
+---

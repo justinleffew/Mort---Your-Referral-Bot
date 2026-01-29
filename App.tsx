@@ -51,22 +51,6 @@ const getCadenceLabel = (profile?: RealtorProfile, cadenceDays?: number) => {
   return 'Quarterly';
 };
 
-const parseCsvRows = (content: string) => {
-  const rows = content
-    .split(/\r?\n/)
-    .map(row => row.trim())
-    .filter(Boolean);
-  if (rows.length === 0) return [];
-  const headers = rows[0].split(',').map(header => header.trim());
-  return rows.slice(1).map(row => {
-    const values = row.split(',').map(value => value.trim());
-    return headers.reduce<Record<string, string>>((acc, header, index) => {
-      acc[header] = values[index] ?? '';
-      return acc;
-    }, {});
-  });
-};
-
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, '');
   if (!digits) return '';
@@ -118,6 +102,7 @@ const PLAYBOOKS = [
 const PlaybookPanel: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showPlaybooks, setShowPlaybooks] = useState(false);
 
   const handleCopy = async (content: string, id: string) => {
     setError(null);
@@ -131,126 +116,60 @@ const PlaybookPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">Playbooks</p>
-          <h3 className="text-xl font-black text-white uppercase tracking-tighter">Copy-ready scripts</h3>
+    <>
+      <div className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">Playbooks</p>
+            <h3 className="text-xl font-black text-white uppercase tracking-tighter">Copy-ready scripts</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowPlaybooks(true)}
+            className="text-xs font-black uppercase tracking-[0.2em] text-indigo-300 border border-indigo-500/40 px-4 py-2 rounded-full hover:text-white hover:border-indigo-400 transition-colors"
+          >
+            View scripts
+          </button>
         </div>
       </div>
-      <div className="grid gap-4">
-        {PLAYBOOKS.map(playbook => (
-          <div key={playbook.id} className="bg-slate-950/70 border border-white/5 rounded-2xl p-4 space-y-3">
+      {showPlaybooks && (
+        <div className="fixed inset-0 z-[120] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowPlaybooks(false)}></div>
+          <div className="relative bg-slate-900 border border-white/10 w-full max-w-2xl rounded-[2.5rem] p-8 space-y-6 shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-black uppercase tracking-widest text-indigo-300">{playbook.title}</p>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">Playbooks</p>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Copy-ready scripts</h3>
+              </div>
               <button
-                type="button"
-                onClick={() => handleCopy(playbook.body, playbook.id)}
-                className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300 hover:text-emerald-200 transition"
+                onClick={() => setShowPlaybooks(false)}
+                className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition"
               >
-                {copiedId === playbook.id ? 'Copied' : 'Copy'}
+                Close
               </button>
             </div>
-            <p className="text-sm text-slate-200 whitespace-pre-line">{playbook.body}</p>
+            <div className="grid gap-4 max-h-[60vh] overflow-y-auto pr-2">
+              {PLAYBOOKS.map(playbook => (
+                <div key={playbook.id} className="bg-slate-950/70 border border-white/5 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-black uppercase tracking-widest text-indigo-300">{playbook.title}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(playbook.body, playbook.id)}
+                      className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300 hover:text-emerald-200 transition"
+                    >
+                      {copiedId === playbook.id ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="text-sm text-slate-200 whitespace-pre-line">{playbook.body}</p>
+                </div>
+              ))}
+            </div>
+            {error && <p className="text-xs font-semibold text-amber-400">{error}</p>}
           </div>
-        ))}
-      </div>
-      {error && <p className="mt-3 text-xs font-semibold text-amber-400">{error}</p>}
-    </div>
-  );
-};
-
-const ImportContactsModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onImported?: () => void;
-}> = ({ isOpen, onClose, onImported }) => {
-  const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ added: number; updated: number; skipped: number } | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setImportResult(null);
-      setImportError(null);
-      setIsImporting(false);
-    }
-  }, [isOpen]);
-
-  const handleCsvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setIsImporting(true);
-    setImportError(null);
-    setImportResult(null);
-    const text = await file.text();
-    const rows = parseCsvRows(text);
-    if (rows.length === 0) {
-      setImportError('No rows detected. Please upload a CSV with headers.');
-      setIsImporting(false);
-      event.target.value = '';
-      return;
-    }
-    const result = await dataService.bulkImport(rows);
-    setImportResult(result);
-    setIsImporting(false);
-    event.target.value = '';
-    onImported?.();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
-      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
-        <div className="text-center space-y-2">
-          <h3 className="text-xl font-black text-white uppercase tracking-tighter">Import Contacts</h3>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">CSV or Google</p>
         </div>
-        <label className="w-full bg-slate-800 border border-white/5 p-5 rounded-3xl flex items-center gap-4 cursor-pointer hover:bg-slate-700 transition-colors shadow-lg">
-          <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-300">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M8 12l4-4m0 0l4 4m-4-4v12"/></svg>
-          </div>
-          <div>
-            <p className="text-white font-black uppercase text-xs tracking-widest">Upload CSV</p>
-            <p className="text-slate-500 text-xs font-bold">Use Name, Email, Phone headers</p>
-          </div>
-          <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvUpload} />
-        </label>
-        <button
-          type="button"
-          disabled
-          className="w-full bg-slate-800/40 border border-white/5 p-5 rounded-3xl flex items-center gap-4 text-left opacity-60 cursor-not-allowed"
-        >
-          <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-300">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 3v18m9-9H3"/></svg>
-          </div>
-          <div>
-            <p className="text-white font-black uppercase text-xs tracking-widest">Connect Google</p>
-            <p className="text-slate-500 text-xs font-bold">Coming soon</p>
-          </div>
-        </button>
-        {isImporting && (
-          <div className="text-xs font-semibold text-slate-400 text-center">
-            Importing…
-          </div>
-        )}
-        {importError && (
-          <div className="text-xs font-semibold text-rose-300 text-center">
-            {importError}
-          </div>
-        )}
-        {importResult && (
-          <div className="text-xs font-semibold text-emerald-300 text-center">
-            {importResult.added} added · {importResult.updated} updated · {importResult.skipped} skipped
-          </div>
-        )}
-        <button onClick={onClose} className="w-full text-slate-600 font-black uppercase text-xs tracking-[0.2em] pt-2">
-          Close
-        </button>
-      </div>
-    </div>
+      )}
+    </>
   );
 };
 
@@ -264,7 +183,6 @@ const Dashboard: React.FC = () => {
   const [cadenceDays, setCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
   const [cadenceLabel, setCadenceLabel] = useState(getCadenceLabel(DEFAULT_PROFILE));
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const [showImportMenu, setShowImportMenu] = useState(false);
   const [runNowOpportunities, setRunNowOpportunities] = useState<Opportunity[]>([]);
   const [runNowLoading, setRunNowLoading] = useState(false);
   const [runNowError, setRunNowError] = useState<string | null>(null);
@@ -425,12 +343,6 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <ImportContactsModal
-        isOpen={showImportMenu}
-        onClose={() => setShowImportMenu(false)}
-        onImported={() => void refreshRadar()}
-      />
-
       <div className="bg-slate-900/40 border border-white/5 rounded-[2.5rem] p-6 mb-8 flex items-center justify-between shadow-2xl">
           <div className="flex-1">
             <h4 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] mb-2">Radar Coverage</h4>
@@ -447,15 +359,6 @@ const Dashboard: React.FC = () => {
           >
             <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           </button>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-end gap-3 mb-6 px-2">
-        <button
-          onClick={() => setShowImportMenu(true)}
-          className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400 transition-colors"
-        >
-          Import contacts (CSV or Google)
-        </button>
       </div>
 
       <div className="flex justify-between items-center mb-6 px-2">
@@ -614,12 +517,6 @@ const Dashboard: React.FC = () => {
               className="bg-white text-slate-950 font-black uppercase tracking-[0.2em] py-4 px-12 rounded-full transition-all shadow-xl active:scale-95"
             >
               Add Contact
-            </button>
-            <button
-              onClick={() => setShowImportMenu(true)}
-              className="text-xs font-black uppercase tracking-widest px-6 py-2 rounded-full border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400 transition-colors"
-            >
-              Import contacts (CSV or Google)
             </button>
             {contactsCount === 0 && !sampleSeeded && (
               <button
@@ -1482,134 +1379,6 @@ const EditContact: React.FC = () => {
     );
 };
 
-const getEstimatedInsurance = (price: number) => {
-  if (price <= 300000) return 100;
-  if (price <= 500000) return 100 + (price - 300000) * 0.000125;
-  return 125 + (price - 500000) * 0.0001;
-};
-
-const Calculator: React.FC = () => {
-  const [price, setPrice] = useState<number>(500000);
-  const [down, setDown] = useState<number>(20);
-  const [rate, setRate] = useState<number>(6.5);
-  const [taxes, setTaxes] = useState<number>(6000);
-  const [insurance, setInsurance] = useState<number>(() => getEstimatedInsurance(500000));
-  const [insuranceEdited, setInsuranceEdited] = useState(false);
-  const [pmiRate, setPmiRate] = useState<number>(0.5);
-  const [showMode, setShowMode] = useState(false);
-  const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
-
-  useEffect(() => {
-    void (async () => {
-      const savedProfile = await dataService.getProfile();
-      setProfile(savedProfile);
-    })();
-  }, []);
-  
-  useEffect(() => {
-    if (!insuranceEdited) {
-      setInsurance(getEstimatedInsurance(price));
-    }
-  }, [insuranceEdited, price]);
-
-  const monthlyInsurance = insurance;
-  const monthlyTaxes = taxes / 12;
-  const loanAmount = price * (1 - down / 100);
-  const monthlyRate = rate / 100 / 12;
-  const numPayments = 30 * 12;
-  const monthlyPI = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
-  const isPmiRequired = down < 20;
-  const monthlyPmi = isPmiRequired ? (loanAmount * (pmiRate / 100)) / 12 : 0;
-  const totalMonthly = monthlyPI + monthlyTaxes + monthlyInsurance + monthlyPmi;
-
-  const InputStyle = "w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-white font-bold outline-none transition-all focus:ring-2 focus:ring-pink-500";
-  
-  if (showMode) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-slate-950 p-6 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300 overflow-y-auto">
-        <button onClick={() => setShowMode(false)} className="absolute top-6 right-6 text-slate-500 uppercase font-black text-xs tracking-widest bg-slate-900 border border-white/5 px-6 py-3 rounded-full active:scale-95 transition-all">Exit Presentation</button>
-        <div className="w-full max-w-lg space-y-10 text-center my-auto">
-          <div className="space-y-4">
-            <h4 className="text-xs font-black uppercase tracking-[0.5em] text-pink-500">Total Monthly Payment</h4>
-            <div className="text-9xl font-black text-white tracking-tighter tabular-nums">${Math.round(totalMonthly).toLocaleString()}</div>
-            <div className="flex justify-center gap-6 text-xs font-black text-slate-500 uppercase tracking-widest">
-              <span>P&I: ${Math.round(monthlyPI)}</span>
-              <span>Taxes: ${Math.round(monthlyTaxes)}</span>
-              <span>Ins: ${Math.round(monthlyInsurance)}</span>
-              {isPmiRequired && <span>PMI: ${Math.round(monthlyPmi)}</span>}
-            </div>
-          </div>
-          <div className="bg-slate-900 border border-white/5 p-10 rounded-[3rem] space-y-8 shadow-2xl">
-             <div className="space-y-4">
-                <div className="flex justify-between items-end px-2"><label className="text-xs font-black uppercase tracking-widest text-slate-500">Price</label><span className="text-3xl font-black text-white">${price.toLocaleString()}</span></div>
-                <input type="range" min="100000" max="2000000" step="10000" value={price} onChange={e => setPrice(Number(e.target.value))} className="w-full h-4 bg-slate-800 rounded-full appearance-none cursor-pointer accent-pink-500" />
-             </div>
-             <div className="space-y-4">
-                <div className="flex justify-between items-end px-2"><label className="text-xs font-black uppercase tracking-widest text-slate-500">Rate</label><span className="text-3xl font-black text-white">{rate}%</span></div>
-                <input type="range" min="3" max="10" step="0.1" value={rate} onChange={e => setRate(Number(e.target.value))} className="w-full h-4 bg-slate-800 rounded-full appearance-none cursor-pointer accent-indigo-500" />
-             </div>
-          </div>
-          <div className="pt-8 border-t border-white/5 flex items-center justify-center gap-4">
-            {profile.headshot ? <img src={profile.headshot} className="w-16 h-16 rounded-full border-2 border-white/10" alt="Agent" /> : <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center font-black">{profile.name.charAt(0)}</div>}
-            <div className="text-left"><p className="text-xs font-black uppercase tracking-[0.3em] text-pink-500">Consultant</p><p className="text-2xl font-black text-white tracking-tighter">{profile.name}</p></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-md mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Quick Calc</h1>
-          <button onClick={() => setShowMode(true)} className="bg-indigo-600 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-full shadow-xl">Show Mode</button>
-        </div>
-        <div className="bg-slate-800/60 backdrop-blur-md border border-white/10 rounded-[2.5rem] p-8 space-y-6">
-            <div><label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Price</label><input type="number" value={price} onChange={e => setPrice(Number(e.target.value))} className={InputStyle} /></div>
-            <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Down %</label><input type="number" value={down} onChange={e => setDown(Number(e.target.value))} className={InputStyle} /></div>
-                <div><label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Rate</label><input type="number" step="0.1" value={rate} onChange={e => setRate(Number(e.target.value))} className={InputStyle} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Taxes (annual)</label>
-                    <input type="number" value={taxes} onChange={e => setTaxes(Number(e.target.value))} className={InputStyle} />
-                </div>
-                <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Insurance (monthly)</label>
-                    <input
-                        type="number"
-                        value={insurance}
-                        onChange={e => {
-                            setInsurance(Number(e.target.value));
-                            setInsuranceEdited(true);
-                        }}
-                        className={InputStyle}
-                    />
-                </div>
-            </div>
-            {isPmiRequired && (
-                <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">PMI rate (annual %)</label>
-                    <input
-                        type="number"
-                        step="0.1"
-                        min={0}
-                        value={pmiRate}
-                        onChange={e => setPmiRate(Number(e.target.value))}
-                        className={InputStyle}
-                    />
-                </div>
-            )}
-            <div className="pt-8 border-t border-white/5 mt-4 space-y-4">
-                <div className="flex justify-between items-center text-slate-400 font-bold px-1"><span>Total Monthly</span><span className="text-3xl font-black text-white">${Math.round(totalMonthly).toLocaleString()}</span></div>
-                <p className="text-xs text-slate-600 font-semibold text-center">Estimates only. Not a quote.</p>
-            </div>
-        </div>
-    </div>
-  );
-}
-
 const ContactsList: React.FC = () => {
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -1618,7 +1387,6 @@ const ContactsList: React.FC = () => {
     const [nextTouchFilter, setNextTouchFilter] = useState<'all' | 'due' | 'upcoming'>('all');
     const [sortMode, setSortMode] = useState<'name' | 'next-touch'>('name');
     const [showAddMenu, setShowAddMenu] = useState(false);
-    const [showImportMenu, setShowImportMenu] = useState(false);
     const navigate = useNavigate();
 
     const refreshContacts = async () => {
@@ -1718,21 +1486,9 @@ const ContactsList: React.FC = () => {
               </div>
             )}
 
-            <ImportContactsModal
-                isOpen={showImportMenu}
-                onClose={() => setShowImportMenu(false)}
-                onImported={() => void refreshContacts()}
-            />
-
             <div className="flex justify-between items-center mb-6 px-2">
                 <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Contacts</h1>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowImportMenu(true)}
-                        className="text-slate-300 text-xs font-black uppercase tracking-widest border border-slate-600/60 px-4 py-2 rounded-full hover:text-white hover:border-slate-400 transition-colors"
-                    >
-                        Import contacts (CSV or Google)
-                    </button>
                     <button onClick={() => setShowAddMenu(true)} className="text-pink-500 text-xs font-black uppercase tracking-widest border border-pink-500/30 px-4 py-2 rounded-full hover:bg-pink-500/10 transition-colors">Record New</button>
                 </div>
             </div>
@@ -1967,7 +1723,6 @@ const BottomNav: React.FC = () => {
             <Link to="/actions" className={navItemClass('/actions')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12h3l3 8 4-16 3 8h5" /></svg><span className="text-xs font-black uppercase tracking-tighter">Actions</span></Link>
             <Link to="/mort" className={navItemClass('/mort')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Mort</span></Link>
             <Link to="/contacts" className={navItemClass('/contacts')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Contacts</span></Link>
-            <Link to="/tools" className={navItemClass('/tools')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Calc</span></Link>
             <Link to="/settings" className={navItemClass('/settings')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg><span className="text-xs font-black uppercase tracking-tighter">Prefs</span></Link>
         </nav>
     );
@@ -2101,7 +1856,6 @@ export default function App() {
                 <Route path="/contacts/add" element={<EditContact />} />
                 <Route path="/contacts/edit/:id" element={<EditContact />} />
                 <Route path="/contacts/:id" element={<ContactDetail />} />
-                <Route path="/tools" element={<Calculator />} />
                 <Route path="/settings" element={<Settings />} />
             </Routes>
         </Layout>
