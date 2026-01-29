@@ -1631,7 +1631,7 @@ const ContactsList: React.FC = () => {
     }, []);
 
     const availableSegments = Array.from(
-        new Set(contacts.map(c => c.segment).filter((segment): segment is string => Boolean(segment)))
+        new Set<string>(contacts.map(c => c.segment).filter((segment): segment is string => Boolean(segment)))
     ).sort((a, b) => a.localeCompare(b));
     const tagFilters = tagsFilterInput
         .split(',')

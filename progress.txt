@@ -47,3 +47,31 @@
   - Gotchas
     - Repo typecheck currently fails due to unrelated TS errors and Deno edge function types.
 ---
+## 2026-01-29 02:56 - US-002
+- What was implemented
+  - Added an authenticated news search edge function backed by GDELT, plus a client helper to fetch interest + location matches.
+  - Enriched interest-based radar prompts with a recent event context when available.
+  - Documented the Realtor radar flow and cadence guidance.
+- Files changed
+  - supabase/functions/mort-news-search/index.ts
+  - services/newsService.ts
+  - services/openaiService.ts
+  - types.ts
+  - App.tsx
+  - services/dataService.ts
+  - tsconfig.json
+  - env.d.ts
+  - docs/realtor-radar-flow.md
+  - prd.json
+- Assumptions made (if any)
+  - GDELT's public doc API is acceptable as an API-based news source and returns `articles` with `title`, `url`, `seendate`, and `domain` fields.
+  - A 30-day timespan and date-sorted results are sufficiently deterministic for the same interest/location input.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Event enrichment can be injected into radar prompts without altering UI flows.
+  - Gotchas
+    - None observed.
+---

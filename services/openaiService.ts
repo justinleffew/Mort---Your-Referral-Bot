@@ -1,6 +1,7 @@
 import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient, GeneralAssistResponse } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctions";
+import { searchNewsEvents } from "./newsService";
 
 type EdgeFunctionResponse<T> = {
     data?: T;
@@ -96,6 +97,19 @@ export const generateRadarMessage = async (
     const mortgageContext = contact.mortgage_inference
         ? `Financial Inference: ${contact.mortgage_inference.opportunity_tag} due to ${contact.mortgage_inference.reasoning}`
         : '';
+    let eventContext = '';
+    if (angle === 'interest_based' && contact.radar_interests.length > 0) {
+        const events = await searchNewsEvents({
+            interest: contact.radar_interests[0],
+            location: contact.location_context,
+            limit: 3,
+        });
+        const topEvent = events[0];
+        if (topEvent) {
+            const eventDate = new Date(topEvent.published_at).toLocaleDateString();
+            eventContext = `Recent event match: ${topEvent.title} (${topEvent.source}, ${eventDate}). ${topEvent.relevance} Link: ${topEvent.url}`;
+        }
+    }
 
     const firstName = contact.full_name.split(' ')[0];
     const fallbacks: Record<RadarAngle, string> = {
@@ -115,6 +129,7 @@ export const generateRadarMessage = async (
         Interests: ${interestsText}
         Family: ${contact.family_details.children.join(', ')}
         Notes (recent first): ${notesText || 'None'}
+        ${eventContext}
         ${mortgageContext}
         Safe mode: ${contact.safe_mode ? 'on' : 'off'}
         Angle: ${angle}
