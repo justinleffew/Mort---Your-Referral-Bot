@@ -17,9 +17,8 @@ const corsHeaders = (req: Request) => {
       const hostname = url.hostname;
       const isVercel = hostname.endsWith('.vercel.app');
       const isLocalhost = hostname === 'localhost';
-      const isHeydad = origin === 'https://heydad.pro' || origin === 'https://www.heydad.pro';
 
-      if (isHeydad || isVercel || isLocalhost) {
+      if (isVercel || isLocalhost) {
         allowOrigin = origin;
       }
     } catch {
