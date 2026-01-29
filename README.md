@@ -19,7 +19,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1_XLE-ICPkgAeN1oo_OrMej
    - Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for your Supabase project.
    - The app will not use Supabase unless both variables are set.
    - Set `VITE_AUTH_REDIRECT_URL` to the production callback URL (e.g. `https://mort-your-referral-bot.vercel.app/`) so Supabase email signups return to the correct site.
-   - Configure the Supabase Edge Function environment with `OPENAI_SECRET_KEY` (or `OPENAI_API_KEY`) for AI responses.
+   - Configure the Supabase Edge Function environment with `OPENAI_SECRET_KEY` and `OPENAI_API_KEY` (both set to the same value) for AI responses, and mirror the same pair in Vercel env vars to avoid drift.
 3. Run the app:
    `npm run dev`
 
