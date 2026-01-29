@@ -1,6 +1,7 @@
 import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient, GeneralAssistResponse } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctions";
+import { EDGE_FUNCTIONS } from "./edgeFunctionConfig";
 import { searchNewsEvents } from "./newsService";
 
 type EdgeFunctionResponse<T> = {
@@ -24,7 +25,7 @@ const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
     }
 
     const payload = await invokeEdgeFunction<EdgeFunctionResponse<T>, { prompt: string }>({
-        functionName: 'mort-openai',
+        functionName: EDGE_FUNCTIONS.OPENAI,
         body: { prompt },
     });
     if (!payload?.data) {
@@ -59,7 +60,7 @@ export const generateSpeechAudio = async (text: string, voice: string): Promise<
     }
 
     const payload = await invokeEdgeFunction<EdgeFunctionResponse<OpenAiTtsResponse>, { text: string; voice: string }>({
-        functionName: 'mort-openai-tts',
+        functionName: EDGE_FUNCTIONS.OPENAI_TTS,
         body: {
             text: trimmed,
             voice

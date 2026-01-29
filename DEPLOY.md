@@ -14,10 +14,18 @@ supabase login
 supabase link --project-ref <PROJECT_REF>
 ```
 
+Project ref used: `<PROJECT_REF>` (replace with your Supabase project ref).
+
 ## Ensure OpenAI secrets are unified
 
 ```powershell
 supabase secrets set OPENAI_SECRET_KEY="<OPENAI_API_KEY>" OPENAI_API_KEY="<OPENAI_API_KEY>"
+```
+
+## Configure production CORS origins
+
+```powershell
+supabase secrets set MORT_PRODUCTION_ORIGINS="https://mort-your-referral-bot.vercel.app"
 ```
 
 ## Deploy functions
@@ -31,7 +39,7 @@ supabase functions deploy mort-news-search
 
 ## Optional cleanup (remove legacy slugs)
 
-If older function slugs were deployed (`open-ai`, `quick-action`), remove them to avoid confusion:
+If older function slugs were deployed (`open-ai`, `quick-action`), remove them to avoid confusion. The app must call `/functions/v1/mort-openai`, `/functions/v1/mort-openai-tts`, `/functions/v1/mort-run-now`, and `/functions/v1/mort-news-search`.
 
 ```powershell
 supabase functions delete open-ai

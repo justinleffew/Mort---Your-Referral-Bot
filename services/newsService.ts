@@ -1,4 +1,5 @@
 import { invokeEdgeFunction } from './edgeFunctions';
+import { EDGE_FUNCTIONS } from './edgeFunctionConfig';
 import { NewsEvent } from '../types';
 
 type NewsSearchResponse = {
@@ -17,7 +18,7 @@ export const searchNewsEvents = async ({
   if (!interest.trim()) return [];
   try {
     const payload = await invokeEdgeFunction<NewsSearchResponse, { interest: string; location?: string; limit?: number }>({
-      functionName: 'mort-news-search',
+      functionName: EDGE_FUNCTIONS.NEWS_SEARCH,
       body: {
         interest: interest.trim(),
         location: location?.trim() || undefined,

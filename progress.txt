@@ -279,3 +279,27 @@
   - Gotchas
     - None.
 ---
+## 2026-01-29 19:50 - ADHOC-POST-DEPLOY-AUDIT
+- What was implemented
+  - Centralized edge function slugs/paths and updated client calls to use shared config.
+  - Allowed configurable production origins in shared CORS handling while keeping localhost and *.vercel.app support.
+  - Documented production CORS origin setup and reinforced new edge function slugs in deploy notes.
+- Files changed
+  - services/edgeFunctionConfig.ts
+  - services/openaiService.ts
+  - services/newsService.ts
+  - services/dataService.ts
+  - supabase/functions/_shared/cors.ts
+  - DEPLOY.md
+- Assumptions made (if any)
+  - Production origins beyond the default Vercel domain will be supplied via MORT_PRODUCTION_ORIGINS when needed.
+  - The Supabase project ref is not stored in-repo, so the deploy doc leaves a placeholder to be filled with the active ref.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Edge function slugs can be centralized for consistent client usage.
+  - Gotchas
+    - None observed.
+---
