@@ -85,30 +85,30 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
 
   return (
     <section className="max-w-md mx-auto p-6 pb-0">
-      <div className="bg-slate-900/60 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+      <div className="bg-surface border border-border rounded-[2.5rem] p-8 shadow-2xl space-y-6">
         <div>
-          <p className="text-xs font-black uppercase tracking-widest text-slate-500">Secure Access</p>
-          <h2 className="text-2xl font-black text-white uppercase tracking-tighter mt-2">Sign In</h2>
-          <p className="text-xs text-slate-400 mt-2">Create an account or use your email to continue.</p>
+          <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Secure Access</p>
+          <h2 className="text-2xl font-black text-foreground uppercase tracking-tighter mt-2">Sign In</h2>
+          <p className="text-xs text-muted-foreground mt-2">Create an account or use your email to continue.</p>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-black uppercase tracking-widest text-slate-500">Email</label>
+            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Email</label>
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="mt-2 w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="mt-2 w-full bg-muted border border-border rounded-2xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="you@example.com"
             />
           </div>
           <div>
-            <label className="text-xs font-black uppercase tracking-widest text-slate-500">Password</label>
+            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Password</label>
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="mt-2 w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="mt-2 w-full bg-muted border border-border rounded-2xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="••••••••"
             />
           </div>
@@ -117,20 +117,20 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
           <button
             onClick={handleSignUp}
             disabled={!email || !password || !supabase}
-            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black uppercase text-xs py-4 rounded-2xl transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            className="w-full bg-primary text-white font-black uppercase text-xs py-4 rounded-2xl transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-app"
           >
             {isSubmitting ? 'Working...' : 'Sign Up'}
           </button>
           <button
             onClick={handleSignIn}
             disabled={!email || !password || !supabase}
-            className="w-full bg-slate-800 text-white font-black uppercase text-xs py-4 rounded-2xl border border-white/10 transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            className="w-full bg-muted text-foreground font-black uppercase text-xs py-4 rounded-2xl border border-border transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-app"
           >
             {isSubmitting ? 'Working...' : 'Sign In'}
           </button>
         </div>
         {(message || error) && (
-          <div className={`text-xs font-bold ${error ? 'text-red-400' : 'text-emerald-400'}`}>
+          <div className={`text-xs font-bold ${error ? 'text-rose-600' : 'text-success'}`}>
             {error ?? message}
           </div>
         )}

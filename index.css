@@ -2,14 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    color-scheme: light;
+    --color-app: 249 250 251;
+    --color-surface: 255 255 255;
+    --color-surface-muted: 243 244 246;
+    --color-border: 229 231 235;
+    --color-primary: 37 99 235;
+    --color-secondary: 224 231 255;
+    --color-success: 5 150 105;
+    --color-text-primary: 17 24 39;
+    --color-text-secondary: 107 114 128;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --color-app: 15 23 42;
+      --color-surface: 30 41 59;
+      --color-surface-muted: 15 23 42;
+      --color-border: 51 65 85;
+      --color-primary: 59 130 246;
+      --color-secondary: 30 64 175;
+      --color-success: 16 185 129;
+      --color-text-primary: 248 250 252;
+      --color-text-secondary: 148 163 184;
+    }
+  }
+
+  html {
+    font-size: 18px;
+  }
+}
+
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #0f172a; /* slate-900 */
-  color: #f8fafc;
+  background-color: rgb(var(--color-app));
+  color: rgb(var(--color-text-primary));
+  font-weight: 400;
 }
 
 button:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid rgb(var(--color-primary));
   outline-offset: 2px;
 }
 
@@ -19,14 +54,14 @@ button:focus-visible {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: rgb(var(--color-app));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: rgb(var(--color-border));
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: rgb(var(--color-text-secondary));
 }

@@ -109,39 +109,39 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
 
     if (loading) {
         return (
-            <div className="bg-slate-800/60 border border-white/10 rounded-3xl p-6 h-64 shadow-xl">
-                <div className="h-6 bg-slate-700/40 rounded-full w-1/2 mb-4"></div>
-                <div className="h-32 bg-slate-700/25 rounded-2xl mb-4"></div>
+            <div className="bg-surface border border-border rounded-3xl p-6 h-64 shadow-xl">
+                <div className="h-6 bg-muted rounded-full w-1/2 mb-4"></div>
+                <div className="h-32 bg-muted rounded-2xl mb-4"></div>
             </div>
         );
     }
 
     return (
-        <div className="bg-slate-800/50 backdrop-blur-lg border border-white/10 rounded-[2.5rem] p-6 shadow-2xl transition-all">
+        <div className="bg-surface border border-border rounded-[2.5rem] p-6 shadow-2xl transition-all">
             <div className="flex justify-between items-start mb-4">
                 <div className="flex gap-3 items-center">
-                    <div className="w-12 h-12 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white font-black border border-white/10 shadow-lg">
+                    <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white font-black border border-border shadow-lg">
                         {contact.full_name.charAt(0)}
                     </div>
                     <div>
-                        <h3 className="font-bold text-white text-lg leading-tight">{contact.full_name}</h3>
+                        <h3 className="font-bold text-foreground text-lg leading-tight">{contact.full_name}</h3>
                         <div className="flex flex-wrap gap-2 items-center mt-1">
                             {contact.mortgage_inference && (
-                                <span className="bg-pink-500/20 text-pink-400 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-pink-500/30">
+                                <span className="bg-secondary text-foreground text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-primary/20">
                                     {contact.mortgage_inference.opportunity_tag}
                                 </span>
                             )}
                             {contact.do_not_contact && (
-                                <span className="bg-rose-500/20 text-rose-300 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-rose-500/40">
+                                <span className="bg-rose-100 text-rose-700 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-rose-200">
                                     Do not contact
                                 </span>
                             )}
                             {contact.radar_interests.length > 0 && (
-                                <span className="bg-cyan-500/20 text-cyan-400 text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-cyan-500/30">
+                                <span className="bg-secondary text-foreground text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-primary/20">
                                     {contact.radar_interests[0]}
                                 </span>
                             )}
-                            <span className="text-xs font-semibold text-slate-400">
+                            <span className="text-xs font-semibold text-muted-foreground">
                                 Next touch: {formatShortDate(nextTouchDate)}
                             </span>
                             <span className={`text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${nextTouchBadgeStyles}`}>
@@ -153,24 +153,24 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                 <button
                     onClick={onDismiss}
                     aria-label="Dismiss card"
-                    className="p-2 text-slate-600 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                    className="p-2 text-muted-foreground hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2 focus-visible:ring-offset-app"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
 
-            <div className="bg-slate-900/60 rounded-3xl p-5 mb-5 border border-white/5">
+            <div className="bg-muted rounded-3xl p-5 mb-5 border border-border">
                 <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
+                    <span className="text-xs font-black uppercase tracking-[0.2em] text-primary">
                         {generated?.angle.replace(/_/g, ' ')}
                     </span>
                 </div>
                 
-                <div className="mb-4 space-y-2 border-l-2 border-pink-500/30 pl-4 py-1">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Why now</p>
-                    <p className="text-xs text-slate-400 font-medium italic">{generated?.reason}</p>
+                <div className="mb-4 space-y-2 border-l-2 border-primary/30 pl-4 py-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Why now</p>
+                    <p className="text-xs text-muted-foreground font-medium italic">{generated?.reason}</p>
                     {contact.mortgage_inference && (
-                        <p className="text-[10px] text-pink-400/80 font-bold uppercase tracking-tighter">
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">
                             Reasoning: {contact.mortgage_inference.reasoning}
                         </p>
                     )}
@@ -178,14 +178,14 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
 
                 {isEditing ? (
                     <textarea 
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-white text-sm focus:ring-2 focus:ring-pink-500 outline-none resize-none"
+                        className="w-full bg-surface border border-border rounded-xl p-4 text-foreground text-sm focus:ring-2 focus:ring-primary outline-none resize-none"
                         rows={3}
                         value={editedMessage}
                         onChange={(e) => setEditedMessage(e.target.value)}
                         ref={messageRef}
                     />
                 ) : (
-                    <p className="text-slate-200 text-sm whitespace-pre-wrap leading-relaxed font-medium" onClick={() => setIsEditing(true)}>
+                    <p className="text-foreground text-sm whitespace-pre-wrap leading-relaxed font-medium" onClick={() => setIsEditing(true)}>
                         {editedMessage}
                     </p>
                 )}
@@ -196,20 +196,20 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
                     <button 
                         onClick={handleCopy}
                         disabled={contact.do_not_contact}
-                        className={`flex-[2] py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-slate-950'} ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : ''}`}
+                        className={`flex-[2] py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 focus-visible:ring-offset-app ${copied ? 'bg-success text-white' : 'bg-primary text-white'} ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : ''}`}
                     >
                         {copied ? 'Copied' : 'Copy Message'}
                     </button>
                     <button 
                         onClick={handleSent}
                         disabled={contact.do_not_contact}
-                        className={`flex-1 py-4 bg-slate-900 border border-white/5 text-slate-400 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : 'hover:text-white'}`}
+                        className={`flex-1 py-4 bg-muted border border-border text-muted-foreground rounded-2xl text-xs font-black uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-app ${contact.do_not_contact ? 'cursor-not-allowed opacity-50' : 'hover:text-primary'}`}
                     >
                         Sent
                     </button>
                 </div>
                 {copyError && (
-                    <p className="mt-2 text-xs font-semibold text-amber-400">
+                    <p className="mt-2 text-xs font-semibold text-amber-600">
                         {copyError}
                     </p>
                 )}
