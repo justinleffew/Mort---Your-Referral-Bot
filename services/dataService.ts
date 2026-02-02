@@ -89,6 +89,7 @@ let cachedProfile: RealtorProfile | null = null;
 let cachedProfileUserId: string | null = null;
 let profileFetchPromise: Promise<RealtorProfile> | null = null;
 let profileFetchErrorUserId: string | null = null;
+let referralEventsDisabled = false;
 
 const shouldDisableProfileSync = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
   const status = error.status ?? Number(error.code);
@@ -109,6 +110,20 @@ const disableProfileSync = (error: { message?: string; code?: string; details?: 
   if (!profileSyncDisabled && shouldDisableProfileSync(error)) {
     profileSyncDisabled = true;
     console.warn('Disabling Supabase profile sync due to repeated errors. Falling back to local storage.');
+  }
+};
+
+const shouldDisableReferralEvents = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
+  const status = error.status ?? Number(error.code);
+  if (status === 404) return true;
+  const message = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+  return message.includes('referral_events') || message.includes('relation') || message.includes('schema cache');
+};
+
+const disableReferralEvents = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
+  if (!referralEventsDisabled && shouldDisableReferralEvents(error)) {
+    referralEventsDisabled = true;
+    console.warn('Disabling Supabase referral events due to missing table or schema errors. Falling back to local storage.');
   }
 };
 
@@ -178,9 +193,13 @@ const selectProfileForUser = async (userId: string): Promise<RealtorProfile> => 
       return withProfileDefaults({ name: DEFAULT_PROFILE_NAME });
     }
     if (!data) {
-      console.warn('Profile missing for user', { userId });
-      profileFetchErrorUserId = userId;
+      console.info('Profile missing for user, creating default', { userId });
       profileFetchPromise = null;
+      const ensured = await ensureProfileForUser(userId);
+      if (ensured) {
+        return ensured;
+      }
+      profileFetchErrorUserId = userId;
       return withProfileDefaults({ name: DEFAULT_PROFILE_NAME });
     }
     const profile = withProfileDefaults({
@@ -194,6 +213,41 @@ const selectProfileForUser = async (userId: string): Promise<RealtorProfile> => 
     return profile;
   })();
   return profileFetchPromise;
+};
+
+const ensureProfileForUser = async (userId: string): Promise<RealtorProfile | null> => {
+  if (profileSyncDisabled) {
+    return withProfileDefaults(loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE));
+  }
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  const defaults = withProfileDefaults({ name: DEFAULT_PROFILE_NAME });
+  const payload = {
+    user_id: userId,
+    name: defaults.name,
+    headshot: defaults.headshot ?? null,
+    cadence_type: defaults.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
+    cadence_custom_days: defaults.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
+  };
+  const { data, error } = await supabase
+    .from('realtor_profiles')
+    .upsert(payload, { onConflict: 'user_id' })
+    .select()
+    .maybeSingle();
+  if (error) {
+    console.warn('Failed to ensure profile', error);
+    disableProfileSync(error);
+    return null;
+  }
+  const profile = withProfileDefaults({
+    name: data?.name ?? defaults.name,
+    headshot: data?.headshot ?? defaults.headshot,
+    cadence_type: data?.cadence_type ?? defaults.cadence_type,
+    cadence_custom_days: data?.cadence_custom_days ?? defaults.cadence_custom_days,
+  });
+  cachedProfile = profile;
+  cachedProfileUserId = userId;
+  return profile;
 };
 
 const getSupabaseUserId = async (supabase: ReturnType<typeof getSupabaseClient>) => {
@@ -388,17 +442,19 @@ export const dataService = {
 
   saveProfile: async (profile: RealtorProfile) => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'save profile');
+    const userId = await getSupabaseUserId(supabase);
     if (supabase && userId && !profileSyncDisabled) {
       // Supabase mode.
       const payload = {
+        user_id: userId,
         name: profile.name,
         headshot: profile.headshot ?? null,
+        cadence_type: profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
+        cadence_custom_days: profile.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
       };
       const { error } = await supabase
         .from('realtor_profiles')
-        .update(payload)
-        .eq('user_id', userId);
+        .upsert(payload, { onConflict: 'user_id' });
       if (error) {
         console.warn('Failed to save profile', error);
         disableProfileSync(error);
@@ -463,7 +519,13 @@ export const dataService = {
 
   addContact: async (data: Partial<Contact>): Promise<Contact> => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'add contact');
+    const userId = await getSupabaseUserId(supabase);
+    const demoMode = !userId;
+    console.info('Add contact request', {
+      userId: userId ?? 'none',
+      demoMode,
+      payloadKeys: Object.keys(data),
+    });
     const buildContact = (ownerId: string): Contact =>
       normalizeContact({
         id: uuid(),
@@ -492,8 +554,13 @@ export const dataService = {
 
     if (supabase && userId) {
       // Supabase mode.
+      await ensureProfileForUser(userId);
       const fallbackContact = buildContact(userId);
       const supabasePayload = buildSupabaseContactInsertPayload(fallbackContact);
+      console.info('Supabase add contact insert', {
+        table: 'contacts',
+        payloadKeys: Object.keys(supabasePayload),
+      });
       const { data: inserted, error } = await supabase
         .from('contacts')
         .insert(supabasePayload)
@@ -551,7 +618,7 @@ export const dataService = {
 
   updateContact: async (id: string, data: Partial<Contact>) => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'update contact');
+    const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
       // Supabase mode.
       const supabasePayload = buildSupabaseContactUpdatePayload(data);
@@ -599,24 +666,45 @@ export const dataService = {
 
   addNote: async (contactId: string, text: string) => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'add note');
-    const parsedInterests = extractRadarInterestsFromText(text);
+    const userId = await getSupabaseUserId(supabase);
+    const trimmed = text.trim();
+    if (!trimmed) {
+      throw new Error('Note text is required.');
+    }
+    const parsedInterests = extractRadarInterestsFromText(trimmed);
     const buildNote = (): ContactNote => ({
       id: uuid(),
       contact_id: contactId,
-      body: text,
+      body: trimmed,
       created_at: new Date().toISOString(),
     });
 
     if (supabase && userId) {
       // Supabase mode.
+      console.info('Add note request', {
+        userId,
+        contactId,
+        length: trimmed.length,
+      });
       const { error } = await supabase.from('contact_notes').insert({
         contact_id: contactId,
-        body: text,
+        body: trimmed,
       });
       if (error) {
-        console.warn('Failed to add note', error);
-        throw new Error(formatSupabaseError('add note', error));
+        const message = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+        if (message.includes('note_text')) {
+          const { error: fallbackError } = await supabase.from('contact_notes').insert({
+            contact_id: contactId,
+            note_text: trimmed,
+          } as { contact_id: string; note_text: string });
+          if (fallbackError) {
+            console.warn('Failed to add note (note_text fallback)', fallbackError);
+            throw new Error(formatSupabaseError('add note', fallbackError));
+          }
+        } else {
+          console.warn('Failed to add note', error);
+          throw new Error(formatSupabaseError('add note', error));
+        }
       }
       if (parsedInterests.length > 0) {
         const contact = await dataService.getContactById(contactId);
@@ -657,7 +745,7 @@ export const dataService = {
 
   updateNote: async (noteId: string, text: string) => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'update note');
+    const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
       const { error } = await supabase
         .from('contact_notes')
@@ -679,7 +767,7 @@ export const dataService = {
 
   deleteNote: async (noteId: string) => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'delete note');
+    const userId = await getSupabaseUserId(supabase);
     if (supabase && userId) {
       const { error } = await supabase
         .from('contact_notes')
@@ -809,7 +897,7 @@ export const dataService = {
     options?: { channel?: string; body?: string; source?: string }
   ) => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'add touch');
+    const userId = await getSupabaseUserId(supabase);
     const buildTouch = (ownerId: string): Touch => ({
       id: uuid(),
       contact_id: contactId,
@@ -849,7 +937,7 @@ export const dataService = {
   getReferralEvents: async (): Promise<ReferralEvent[]> => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
-    if (supabase && userId) {
+    if (supabase && userId && !referralEventsDisabled) {
       const { data, error } = await supabase
         .from('referral_events')
         .select('*')
@@ -857,6 +945,7 @@ export const dataService = {
         .order('created_at', { ascending: false });
       if (error) {
         console.warn('Failed to load referral events', error);
+        disableReferralEvents(error);
         return [];
       }
       return (data || []).map(normalizeReferralEvent);
@@ -873,7 +962,7 @@ export const dataService = {
     notes?: string;
   }): Promise<ReferralEvent> => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'add referral event');
+    const userId = await getSupabaseUserId(supabase);
     const now = new Date().toISOString();
     const buildReferral = (ownerId: string): ReferralEvent =>
       normalizeReferralEvent({
@@ -888,7 +977,7 @@ export const dataService = {
         updated_at: now,
       });
 
-    if (supabase && userId) {
+    if (supabase && userId && !referralEventsDisabled) {
       const referral = buildReferral(userId);
       const { data: inserted, error } = await supabase
         .from('referral_events')
@@ -897,6 +986,7 @@ export const dataService = {
         .single();
       if (error) {
         console.warn('Failed to add referral event', error);
+        disableReferralEvents(error);
         throw new Error(formatSupabaseError('add referral event', error));
       }
       return normalizeReferralEvent(inserted);
@@ -912,10 +1002,10 @@ export const dataService = {
 
   updateReferralEvent: async (id: string, updates: Partial<ReferralEvent>) => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'update referral event');
+    const userId = await getSupabaseUserId(supabase);
     const payload = { ...updates, updated_at: new Date().toISOString() };
 
-    if (supabase && userId) {
+    if (supabase && userId && !referralEventsDisabled) {
       const { error } = await supabase
         .from('referral_events')
         .update({ ...payload, user_id: userId })
@@ -923,6 +1013,7 @@ export const dataService = {
         .eq('user_id', userId);
       if (error) {
         console.warn('Failed to update referral event', error);
+        disableReferralEvents(error);
         throw new Error(formatSupabaseError('update referral event', error));
       }
       return;
