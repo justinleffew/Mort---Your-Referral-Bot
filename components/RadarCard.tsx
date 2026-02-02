@@ -54,17 +54,21 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
         setLoading(false);
 
         const usedAt = new Date().toISOString();
-        await dataService.updateRadarState(contact.id, {
-            angles_used_json: [{ angle, used_at: usedAt }],
-            ...(forceRefresh
-                ? {}
-                : {
-                    last_prompt_shown_at: usedAt,
-                    last_angle: angle,
-                    last_reason: result.reason,
-                    last_message: result.message
-                })
-        });
+        try {
+            await dataService.updateRadarState(contact.id, {
+                angles_used_json: [{ angle, used_at: usedAt }],
+                ...(forceRefresh
+                    ? {}
+                    : {
+                        last_prompt_shown_at: usedAt,
+                        last_angle: angle,
+                        last_reason: result.reason,
+                        last_message: result.message
+                    })
+            });
+        } catch (error) {
+            console.warn('Failed to persist radar state update', error);
+        }
     };
 
     const selectMessageForManualCopy = () => {
