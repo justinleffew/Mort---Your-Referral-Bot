@@ -428,3 +428,18 @@
   - Gotchas
     - Supabase auth-gated features should short-circuit edge function calls when no session exists.
 ---
+## 2026-02-02 22:28 - ADHOC-REMOVE-DAILY-FOCUS-COVERAGE
+- What was implemented
+  - Removed the Daily Focus coverage meter from the dashboard header.
+- Files changed
+  - App.tsx
+- Assumptions made (if any)
+  - Treated the Daily Focus coverage request as removing the percentage meter while keeping the add-contact action accessible.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None.
