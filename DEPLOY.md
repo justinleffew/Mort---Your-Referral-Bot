@@ -45,3 +45,9 @@ If older function slugs were deployed (`open-ai`, `quick-action`), remove them t
 supabase functions delete open-ai
 supabase functions delete quick-action
 ```
+
+## Demo auth readiness checklist
+
+- Set `VITE_AUTH_REDIRECT_URL` in Vercel/Supabase frontend env to `https://mort-your-referral-bot.vercel.app/#/auth/callback` to keep hash-based auth callbacks working.
+- If Supabase email confirmation is enabled, pre-create a demo user in Supabase Auth and verify they can sign in without waiting on a confirmation email.
+- Confirm the demo user has a row in `realtor_profiles` or that the app fallback defaults are acceptable for the demo experience.

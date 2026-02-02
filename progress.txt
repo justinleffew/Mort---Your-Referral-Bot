@@ -69,6 +69,7 @@
 - Tests / checks run (and results)
   - npx tsc --noEmit (pass)
   - npm run build (pass)
+  - Skipped lint/tests (no scripts in package.json).
 - Learnings for future iterations:
   - Patterns discovered
     - Event enrichment can be injected into radar prompts without altering UI flows.
@@ -300,6 +301,25 @@
 - Learnings for future iterations:
   - Patterns discovered
     - Edge function slugs can be centralized for consistent client usage.
+  - Gotchas
+    - None observed.
+---
+## 2026-02-02 16:11 - ADHOC-DEMO-AUTH
+- What was implemented
+  - Set the demo auth redirect URL in the environment example and updated run/deploy docs with demo sign-in readiness steps.
+- Files changed
+  - .env.example
+  - README.md
+  - DEPLOY.md
+- Assumptions made (if any)
+  - Treated https://mort-your-referral-bot.vercel.app as the demo domain for the auth redirect URL.
+  - Documented Supabase demo user setup because no Supabase credentials were available in-repo.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Demo readiness steps belong in DEPLOY.md alongside other production checklists.
   - Gotchas
     - None observed.
 ---
