@@ -28,6 +28,8 @@ supabase secrets set OPENAI_SECRET_KEY="<OPENAI_API_KEY>" OPENAI_API_KEY="<OPENA
 supabase secrets set MORT_PRODUCTION_ORIGINS="https://mort-your-referral-bot.vercel.app"
 ```
 
+The demo URL above is already included in the default allowlist inside `supabase/functions/_shared/cors.ts`, and `MORT_PRODUCTION_ORIGINS` augments that list at runtime, so setting the secret to the demo URL keeps CORS aligned with the deployed frontend.
+
 ## Deploy functions
 
 ```powershell
