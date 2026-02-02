@@ -1,48 +1,27 @@
 import React, { useState } from 'react';
-import { generateGeneralAssistResponse, generateMortgageResponse } from '../services/openaiService';
-import { Contact, GeneralAssistResponse, MortgageQueryResponse } from '../types';
-import { UI_LABELS } from '../utils/uiLabels';
+import { generateMortgageResponse } from '../services/openaiService';
+import { MortgageQueryResponse } from '../types';
 
-type MortgageAssistMode = 'mortgage' | 'general';
+interface MortgageAssistProps {}
 
-interface MortgageAssistProps {
-    mode?: MortgageAssistMode;
-    contacts?: Contact[];
-    personaLabel?: string;
-}
-
-const MortgageAssist: React.FC<MortgageAssistProps> = ({
-    mode = 'mortgage',
-    contacts = [],
-    personaLabel,
-}) => {
+const MortgageAssist: React.FC<MortgageAssistProps> = () => {
     const [query, setQuery] = useState('');
     const [response, setResponse] = useState<MortgageQueryResponse | null>(null);
-    const [generalResponse, setGeneralResponse] = useState<GeneralAssistResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [copiedSection, setCopiedSection] = useState<string | null>(null);
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!query.trim()) return;
         setLoading(true);
-        if (mode === 'mortgage') {
-            const res = await generateMortgageResponse(query);
-            setResponse(res);
-            setGeneralResponse(null);
-        } else {
-            const res = await generateGeneralAssistResponse(query, contacts, personaLabel);
-            setGeneralResponse(res);
-            setResponse(null);
-        }
+        const res = await generateMortgageResponse(query);
+        setResponse(res);
         setLoading(false);
     };
 
-    const headerLabel = mode === 'mortgage' ? 'Mortgage Assist' : UI_LABELS.assistant;
-    const placeholder = mode === 'mortgage'
-        ? 'Ask about a mortgage scenario...'
-        : 'Ask about a contact, follow-up ideas, or next steps...';
-    const buttonLabel = mode === 'mortgage' ? 'Generate Response' : `Ask ${UI_LABELS.assistant}`;
-    const containerHeight = mode === 'mortgage' ? 'h-full' : '';
+    const headerLabel = 'Mortgage Assist';
+    const placeholder = 'Ask about a mortgage scenario...';
+    const buttonLabel = 'Generate Response';
+    const containerHeight = 'h-full';
 
     const handleCopy = async (value: string, section: string) => {
         if (!value) return;
@@ -75,7 +54,7 @@ const MortgageAssist: React.FC<MortgageAssistProps> = ({
                     </button>
                 </form>
 
-                {response && mode === 'mortgage' && (
+                {response && (
                     <div className="space-y-4 text-sm text-muted-foreground">
                         <div className="bg-muted border border-border rounded-xl p-4 space-y-3">
                             <div className="flex items-center justify-between">
@@ -144,27 +123,6 @@ const MortgageAssist: React.FC<MortgageAssistProps> = ({
                                 </button>
                             </div>
                             <p className="whitespace-pre-wrap text-lg text-foreground">{response.next_steps}</p>
-                        </div>
-                    </div>
-                )}
-                {generalResponse && mode === 'general' && (
-                    <div className="space-y-4 text-sm text-muted-foreground">
-                        <div className="bg-muted border border-border rounded-xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Assistant Reply</div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleCopy(generalResponse.response, 'assistant_reply')}
-                                    className="text-xs font-black uppercase tracking-widest text-primary inline-flex items-center gap-1"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h10v10H8z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 16H5a2 2 0 01-2-2V5a2 2 0 012-2h9a2 2 0 012 2v1" />
-                                    </svg>
-                                    {copiedSection === 'assistant_reply' ? 'Copied' : 'Copy'}
-                                </button>
-                            </div>
-                            <p className="whitespace-pre-wrap text-lg text-foreground">{generalResponse.response}</p>
                         </div>
                     </div>
                 )}

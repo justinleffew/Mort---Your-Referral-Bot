@@ -407,3 +407,24 @@
   - Gotchas
     - None.
 ---
+## 2026-02-02 22:11 - ADHOC-CONTACTS-DEMO
+- What was implemented
+  - Ensured realtor profiles are upserted when missing, allowed unauthenticated demo/local contact creation, guarded empty notes, and added note_text fallback inserts.
+  - Added settings email display, removed assistant text reply UI, and guarded news search/referral event calls when auth or tables are missing.
+- Files changed
+  - services/dataService.ts
+  - services/newsService.ts
+  - components/MortgageAssist.tsx
+  - App.tsx
+- Assumptions made (if any)
+  - Treated demo mode as an unauthenticated session even when Supabase is configured, so contact writes fall back to local storage.
+  - Assumed some environments still use contact_notes.note_text and added a fallback insert for compatibility.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Use upsert for realtor_profiles to avoid missing-profile errors.
+  - Gotchas
+    - Supabase auth-gated features should short-circuit edge function calls when no session exists.
+---

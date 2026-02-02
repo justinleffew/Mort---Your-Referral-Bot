@@ -1431,7 +1431,7 @@ const EditContact: React.FC = () => {
             navigate('/contacts');
         } catch (error) {
             console.warn('Failed to save contact', error);
-            setSaveError('Save failed. Please retry.');
+            setSaveError(error instanceof Error ? error.message : 'Save failed. Please retry.');
         }
     };
 
@@ -1748,6 +1748,8 @@ const ContactsList: React.FC = () => {
 const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignOut }) => {
     const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [userEmail, setUserEmail] = useState<string>('');
+    const supabase = getSupabaseClient();
 
     useEffect(() => {
         void (async () => {
@@ -1755,6 +1757,18 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
             setProfile(savedProfile);
         })();
     }, []);
+
+    useEffect(() => {
+        if (!supabase) return;
+        void (async () => {
+            const { data, error } = await supabase.auth.getUser();
+            if (error) {
+                console.warn('Failed to load user email', error);
+                return;
+            }
+            setUserEmail(data.user?.email ?? '');
+        })();
+    }, [supabase]);
 
     const save = async () => {
         setSaveError(null);
@@ -1875,6 +1889,12 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
                 </section>
                 <section className="bg-surface border border-border p-8 rounded-[2.5rem] space-y-4">
                    <h2 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Account</h2>
+                   <div className="space-y-2">
+                     <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Signed in as</div>
+                     <div className="rounded-2xl border border-border bg-muted px-4 py-3 text-sm font-semibold text-foreground">
+                       {userEmail?.trim() ? userEmail : 'No email on file'}
+                     </div>
+                   </div>
                    <button onClick={onSignOut} className="w-full border border-rose-200 text-rose-700 font-black uppercase text-xs py-4 rounded-xl">
                      Sign Out
                    </button>
