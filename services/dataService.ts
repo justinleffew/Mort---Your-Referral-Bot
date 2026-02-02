@@ -1026,11 +1026,101 @@ export const dataService = {
     const doNotContactIds = new Set(
       contacts.filter(contact => contact.do_not_contact).map(contact => contact.id)
     );
+    const buildOfflineMessages = (contact: Contact) => {
+      const firstName = contact.full_name.split(' ')[0] || 'there';
+      const interest = contact.radar_interests[0] || 'home projects';
+      const location = contact.location_context || 'your area';
+      return [
+        `Hi ${firstName}, quick check-in—hope you’re doing well. Happy to help with anything home-related.`,
+        `Hi ${firstName}, saw something about ${interest} and thought of you. Hope everything’s going well.`,
+        `Hi ${firstName}, I’ve been keeping an eye on updates around ${location}. If you ever want a quick take, I’m here.`,
+      ];
+    };
+    const buildOfflineOpportunities = async () => {
+      const profile = await dataService.getProfile();
+      const cadenceDefault = resolveCadenceDays(profile);
+      const eligibleContacts = await dataService.getEligibleContacts();
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const yearCutoff = new Date();
+      yearCutoff.setDate(yearCutoff.getDate() - 365);
+      const opportunities = await Promise.all(
+        eligibleContacts.map(async contact => {
+          const cadenceDays = contact.cadence_days ?? cadenceDefault;
+          const [touches, notes] = await Promise.all([
+            dataService.getTouches(contact.id),
+            dataService.getNotes(contact.id),
+          ]);
+          const lastTouchAt = touches[0]?.created_at ?? contact.last_contacted_at ?? null;
+          const lastTouchDate = lastTouchAt ? new Date(lastTouchAt) : null;
+          const daysSinceLastTouch = lastTouchDate && !Number.isNaN(lastTouchDate.getTime())
+            ? Math.floor((Date.now() - lastTouchDate.getTime()) / (1000 * 60 * 60 * 24))
+            : undefined;
+          const daysSinceForScore = typeof daysSinceLastTouch === 'number' ? daysSinceLastTouch : cadenceDays + 1;
+          const touchesLast365 = touches.filter(touch => new Date(touch.created_at) >= yearCutoff).length;
+          const lastNoteAt = notes[0]?.created_at ?? null;
+          const lastNoteDays = lastNoteAt
+            ? Math.floor((Date.now() - new Date(lastNoteAt).getTime()) / (1000 * 60 * 60 * 24))
+            : null;
+
+          let score = 0;
+          if (daysSinceForScore > cadenceDays) score += 30;
+          score += Math.min(notes.length, 20);
+          if (daysSinceForScore > 180) score += 15;
+          if (lastNoteDays !== null && lastNoteDays <= 30) score += 10;
+          if (daysSinceForScore < 14) score -= 20;
+          if (contact.radar_interests.length > 0) score += Math.min(contact.radar_interests.length * 5, 15);
+          if (contact.suggested_action) score += 15;
+
+          const cadenceViolation = daysSinceForScore < cadenceDays;
+          const yearCapExceeded = touchesLast365 >= 4;
+          const warningFlags = [
+            ...(cadenceViolation ? ['CADENCE_VIOLATION'] : []),
+            ...(yearCapExceeded ? ['YEAR_CAP_EXCEEDED'] : []),
+            ...(daysSinceForScore < 14 ? ['TOUCHED_RECENTLY'] : []),
+          ];
+          const reasons = [
+            daysSinceForScore > cadenceDays ? 'Over cadence' : 'Inside cadence',
+            yearCapExceeded ? 'High yearly touch count' : 'Within yearly touch cap',
+            lastNoteAt ? 'Recent notes on file' : 'No recent notes',
+            ...(contact.radar_interests.length > 0 ? ['Interest match'] : []),
+            ...(contact.suggested_action ? ['Suggested action on file'] : []),
+          ];
+
+          return {
+            id: uuid(),
+            user_id: getAgentId(),
+            contact_id: contact.id,
+            area_id: contact.home_area_id ?? null,
+            run_context: 'RUN_NOW',
+            score,
+            reasons,
+            suggested_messages: buildOfflineMessages(contact),
+            status: 'new',
+            warning_flags: warningFlags,
+            last_touch_at: lastTouchAt,
+            touches_last_365: touchesLast365,
+            cadence_violation: cadenceViolation,
+            year_cap_exceeded: yearCapExceeded,
+            created_at: nowIso,
+            updated_at: nowIso,
+            contact_full_name: contact.full_name,
+            cadence_days: cadenceDays,
+            days_since_last_touch: daysSinceLastTouch,
+          } satisfies Opportunity;
+        })
+      );
+
+      return opportunities
+        .filter(opportunity => !doNotContactIds.has(opportunity.contact_id))
+        .sort((a, b) => (b.score !== a.score ? b.score - a.score : (a.contact_full_name ?? '').localeCompare(b.contact_full_name ?? '')))
+        .slice(0, 5);
+    };
     if (supabase && userId) {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData?.session) {
         console.warn('Failed to load session for run now', sessionError);
-        return [];
+        return buildOfflineOpportunities();
       }
       const data = await invokeEdgeFunction<{ opportunities?: Opportunity[] }, { exclude_do_not_contact: boolean }>({
         functionName: EDGE_FUNCTIONS.RUN_NOW,
@@ -1042,7 +1132,7 @@ export const dataService = {
       return Array.isArray(data as unknown) ? (data as Opportunity[]).filter(opportunity => !doNotContactIds.has(opportunity.contact_id)) : [];
     }
 
-    return [];
+    return buildOfflineOpportunities();
   },
 
   bulkImport: async (rows: any[]) => {
