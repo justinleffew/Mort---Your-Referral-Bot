@@ -303,3 +303,19 @@
   - Gotchas
     - None observed.
 ---
+## 2026-02-02 16:09 - ADHOC-SUPABASE-DEMO-READY
+- What was implemented
+  - Documented that the demo URL is already allowlisted for edge function CORS and reiterated that setting MORT_PRODUCTION_ORIGINS keeps the runtime list aligned.
+- Files changed
+  - DEPLOY.md
+- Assumptions made (if any)
+  - Treated https://mort-your-referral-bot.vercel.app as the demo URL referenced by the request.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None.
+---
