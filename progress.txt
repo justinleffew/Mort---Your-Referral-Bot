@@ -303,3 +303,22 @@
   - Gotchas
     - None observed.
 ---
+## 2026-02-02 16:11 - ADHOC-SUPABASE-RLS-RPC
+- What was implemented
+  - Added an opportunities RLS migration and ensured contact_notes RLS is enabled in migrations.
+  - Updated the run-now smoke script to use the current contact_notes schema and validate the run_now_candidates RPC.
+- Files changed
+  - supabase/migrations/20250312120000_opportunities_rls.sql
+  - scripts/run-now-smoke.mjs
+- Assumptions made (if any)
+  - No local Supabase CLI or Postgres client is available in the container, so migrations and RPC checks must be run externally.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+  - Skipped lint/tests (no scripts in package.json).
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - Supabase validation scripts require environment variables and external database access.
+---

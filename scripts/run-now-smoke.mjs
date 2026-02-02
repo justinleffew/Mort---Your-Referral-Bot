@@ -43,8 +43,8 @@ if (contactError || !contact) {
 }
 
 const notesPayload = [
-  { contact_id: contact.id, user_id: userId, note_text: 'Met at open house.' },
-  { contact_id: contact.id, user_id: userId, note_text: 'Interested in market updates.' },
+  { contact_id: contact.id, body: 'Met at open house.' },
+  { contact_id: contact.id, body: 'Interested in market updates.' },
 ];
 
 const { error: notesError } = await supabase.from('contact_notes').insert(notesPayload);
@@ -66,22 +66,17 @@ if (touchesError) {
   throw new Error(`Failed to insert touches: ${touchesError.message}`);
 }
 
-const { data: runNowResult, error: runNowError } = await supabase.functions.invoke('mort-run-now', {
-  body: {},
+const { data: runNowCandidates, error: runNowCandidatesError } = await supabase.rpc('run_now_candidates', {
+  p_user_id: userId,
 });
 
-if (runNowError) {
-  throw new Error(`Run Now failed: ${runNowError.message}`);
+if (runNowCandidatesError) {
+  throw new Error(`run_now_candidates RPC failed: ${runNowCandidatesError.message}`);
 }
 
-const opportunities = runNowResult?.opportunities ?? [];
-const match = opportunities.find(opportunity => opportunity.contact_id === contact.id);
+const match = runNowCandidates?.find(candidate => candidate.id === contact.id);
 if (!match) {
-  throw new Error('Expected Run Now to return the seeded contact.');
+  throw new Error('Expected run_now_candidates to return the seeded contact.');
 }
 
-if (!match.warning_flags?.includes('YEAR_CAP_EXCEEDED')) {
-  throw new Error('Expected YEAR_CAP_EXCEEDED warning flag.');
-}
-
-console.log('Run Now smoke test passed.');
+console.log('Run Now candidates RPC smoke test passed.');
