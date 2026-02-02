@@ -318,4 +318,36 @@
     - None.
   - Gotchas
     - None.
+## 2026-02-02 16:11 - US-003
+- What was implemented
+  - Added an offline/demo fallback for Run Now opportunities using eligible contacts, local scoring, and deterministic message variants when Supabase/session is unavailable.
+- Files changed
+  - services/dataService.ts
+- Assumptions made (if any)
+  - Treated missing touch history as slightly overdue by scoring against cadence + 1 day while omitting days-since metadata to avoid misleading UI chips.
+  - Used deterministic canned message variants to avoid AI dependency when Supabase/session is unavailable.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+  - Skipped lint/tests (no scripts in package.json).
+- Learnings for future iterations:
+  - Patterns discovered
+    - Offline Run Now output can mirror the edge function scoring model for consistent UI results.
+## 2026-02-02 16:10 - ADHOC-DEMO-SEED
+- What was implemented
+  - Added Supabase-aware sample seeding with demo flag/user action support, inserting sample contacts with notes and touches for radar data.
+- Files changed
+  - services/dataService.ts
+  - App.tsx
+- Assumptions made (if any)
+  - Treated the sample seed button click as the explicit user action to allow Supabase demo seeding.
+  - Used the existing localStorage seed flag and contact presence to avoid duplicate demo inserts in Supabase mode.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Demo data seeding can share the same addContact/addNote/addTouch pipeline to keep Supabase and local modes aligned.
+  - Gotchas
+    - None observed.
 ---

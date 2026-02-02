@@ -312,7 +312,7 @@ const Dashboard: React.FC = () => {
     setSampleSeeding(true);
     setRunNowError(null);
     try {
-      await dataService.seedSampleContacts();
+      await dataService.seedSampleContacts({ forceSupabase: true });
       setSampleSeeded(dataService.hasSeededSampleContacts());
       await refreshRadar();
     } catch (error) {
