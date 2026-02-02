@@ -303,3 +303,21 @@
   - Gotchas
     - None observed.
 ---
+## 2026-02-02 16:10 - ADHOC-DEMO-SEED
+- What was implemented
+  - Added Supabase-aware sample seeding with demo flag/user action support, inserting sample contacts with notes and touches for radar data.
+- Files changed
+  - services/dataService.ts
+  - App.tsx
+- Assumptions made (if any)
+  - Treated the sample seed button click as the explicit user action to allow Supabase demo seeding.
+  - Used the existing localStorage seed flag and contact presence to avoid duplicate demo inserts in Supabase mode.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Demo data seeding can share the same addContact/addNote/addTouch pipeline to keep Supabase and local modes aligned.
+  - Gotchas
+    - None observed.
+---
