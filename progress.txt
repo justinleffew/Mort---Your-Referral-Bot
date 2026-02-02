@@ -390,3 +390,20 @@
   - Gotchas
     - None observed.
 ---
+## 2026-02-02 17:38 - ADHOC-FOLLOWUP-QUESTIONS
+- What was implemented
+  - Made commute-mode follow-up questions expandable with text responses and a submit flow, including completion checkmarks after submission.
+- Files changed
+  - components/CommuteMode.tsx
+  - progress.txt
+- Assumptions made (if any)
+  - Treated follow-up answers as additional conversation context by appending question/answer text to the transcript on submit.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None.
+---
