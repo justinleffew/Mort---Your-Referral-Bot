@@ -176,7 +176,6 @@ const PlaybookPanel: React.FC = () => {
 
 const Dashboard: React.FC = () => {
   const [radarItems, setRadarItems] = useState<Array<{ contact: Contact; notes: ContactNote[]; state: RadarState }>>([]);
-  const [stats, setStats] = useState({ total: 0, withInterests: 0, percent: 0 });
   const [contactsCount, setContactsCount] = useState(0);
   const [sampleSeeded, setSampleSeeded] = useState(dataService.hasSeededSampleContacts());
   const [sampleSeeding, setSampleSeeding] = useState(false);
@@ -245,8 +244,6 @@ const Dashboard: React.FC = () => {
       return dueDate <= endOfWeek;
     }).length;
     setDueThisWeekCount(dueThisWeek);
-    const latestStats = await dataService.getStats();
-    setStats(latestStats);
   };
 
   const handleReachedOut = async (contactId: string) => {
@@ -363,30 +360,21 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-surface border border-border rounded-[2.5rem] p-6 mb-8 flex items-center justify-between shadow-2xl">
-          <div className="flex-1">
-            <h4 className="text-xs font-black text-muted-foreground uppercase tracking-[0.3em] mb-2">{UI_LABELS.radar} Coverage</h4>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${stats.percent}%` }}></div>
-              </div>
-              <span className="text-xl font-black text-foreground">{stats.percent}%</span>
-            </div>
-          </div>
-          <button 
-            onClick={() => setShowAddMenu(true)}
-            className="ml-6 w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:scale-95 transition-transform"
-          >
-            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          </button>
-      </div>
-
       <div className="flex justify-between items-center mb-6 px-2">
           <div>
             <h1 className="text-2xl font-black text-foreground uppercase tracking-tighter">This week&apos;s opportunities</h1>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{UI_LABELS.cadence}: {cadenceLabel}</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowAddMenu(true)}
+              className="h-10 w-10 rounded-full bg-primary text-white shadow-[0_10px_20px_rgba(37,99,235,0.25)] active:scale-95 transition-transform"
+              aria-label="Add contact"
+            >
+              <svg className="h-5 w-5 mx-auto" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+              </svg>
+            </button>
             <button
               onClick={handleRunNow}
               disabled={runNowLoading}
