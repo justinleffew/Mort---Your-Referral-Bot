@@ -16,6 +16,9 @@ const CommuteMode: React.FC = () => {
     const [showManualEntry, setShowManualEntry] = useState(false);
     const [followUpResponse, setFollowUpResponse] = useState('');
     const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+    const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
+    const [expandedFollowUps, setExpandedFollowUps] = useState<Record<string, boolean>>({});
+    const [submittedFollowUps, setSubmittedFollowUps] = useState<Record<string, boolean>>({});
     const [isRefining, setIsRefining] = useState(false);
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
     const [selectedVoice, setSelectedVoice] = useState<'alloy' | 'nova'>('nova');
@@ -127,6 +130,9 @@ const CommuteMode: React.FC = () => {
             setConversationTranscript('');
             setFollowUpResponse('');
             setFollowUpQuestions([]);
+            setFollowUpAnswers({});
+            setExpandedFollowUps({});
+            setSubmittedFollowUps({});
             setIsRefining(false);
         }
         setSpeechError('');
@@ -162,6 +168,53 @@ const CommuteMode: React.FC = () => {
             }
         };
     }, [conversationTranscript]);
+
+    useEffect(() => {
+        setFollowUpAnswers({});
+        setExpandedFollowUps({});
+        setSubmittedFollowUps({});
+    }, [followUpQuestions]);
+
+    const handleFollowUpToggle = (question: string) => {
+        setExpandedFollowUps((prev) => ({
+            ...prev,
+            [question]: !prev[question]
+        }));
+    };
+
+    const handleFollowUpAnswerChange = (question: string, value: string) => {
+        setFollowUpAnswers((prev) => ({
+            ...prev,
+            [question]: value
+        }));
+        setSubmittedFollowUps((prev) => ({
+            ...prev,
+            [question]: false
+        }));
+    };
+
+    const handleSubmitFollowUps = () => {
+        const allAnswered = followUpQuestions.every((question) => followUpAnswers[question]?.trim());
+        if (!allAnswered) {
+            return;
+        }
+        const combinedAnswers = followUpQuestions
+            .map((question) => {
+                const answer = followUpAnswers[question]?.trim();
+                return answer ? `${question} ${answer}` : '';
+            })
+            .filter(Boolean)
+            .join('\n');
+        appendToConversation(combinedAnswers);
+        setSubmittedFollowUps(() => {
+            const next: Record<string, boolean> = {};
+            followUpQuestions.forEach((question) => {
+                next[question] = true;
+            });
+            return next;
+        });
+        setExpandedFollowUps({});
+    };
 
     useEffect(() => {
         let active = true;
@@ -398,13 +451,54 @@ const CommuteMode: React.FC = () => {
                             {followUpResponse || 'Tell me specific details so I can trigger real-time moments.'}
                         </p>
                         {followUpQuestions.length > 0 && (
-                            <ul className="mt-3 space-y-2 text-foreground">
-                                {followUpQuestions.map(question => (
-                                    <li key={question} className="rounded-2xl bg-muted px-4 py-2 text-sm font-semibold">
-                                        {question}
-                                    </li>
-                                ))}
-                            </ul>
+                            <div className="mt-3 space-y-3">
+                                <ul className="space-y-2 text-foreground">
+                                    {followUpQuestions.map((question) => {
+                                        const isExpanded = expandedFollowUps[question];
+                                        const answer = followUpAnswers[question] ?? '';
+                                        const isSubmitted = submittedFollowUps[question];
+                                        return (
+                                            <li key={question} className="space-y-2 rounded-2xl bg-muted px-4 py-2 text-sm font-semibold">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleFollowUpToggle(question)}
+                                                    className="flex w-full items-center justify-between gap-3 text-left"
+                                                >
+                                                    <span>{question}</span>
+                                                    {isSubmitted && (
+                                                        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400 bg-emerald-50 text-emerald-600">
+                                                            <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                <path
+                                                                    fillRule="evenodd"
+                                                                    d="M16.704 5.296a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3.25-3.25a1 1 0 011.414-1.414L9.75 11.586l6.543-6.54a1 1 0 011.411-.01z"
+                                                                    clipRule="evenodd"
+                                                                />
+                                                            </svg>
+                                                        </span>
+                                                    )}
+                                                </button>
+                                                {isExpanded && (
+                                                    <textarea
+                                                        value={answer}
+                                                        onChange={(event) => handleFollowUpAnswerChange(question, event.target.value)}
+                                                        rows={3}
+                                                        className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-medium text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                                        placeholder="Type your answer..."
+                                                    />
+                                                )}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmitFollowUps}
+                                    disabled={!followUpQuestions.every((question) => followUpAnswers[question]?.trim())}
+                                    className={`w-full rounded-2xl border border-border px-4 py-3 text-xs font-black uppercase tracking-[0.3em] transition ${followUpQuestions.every((question) => followUpAnswers[question]?.trim()) ? 'bg-primary text-white hover:opacity-90' : 'bg-muted text-muted-foreground opacity-60 cursor-not-allowed'}`}
+                                >
+                                    Submit Answers
+                                </button>
+                            </div>
                         )}
                     </div>
                 )}
