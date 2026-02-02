@@ -303,3 +303,22 @@
   - Gotchas
     - None observed.
 ---
+## 2026-02-02 16:10 - ADHOC-SUPABASE-RADAR-PERSIST
+- What was implemented
+  - Guarded radar state persistence when Supabase has no authenticated user and logged warnings instead of throwing.
+  - Wrapped radar state persistence in the radar card prompt loader to avoid blocking UI updates on persistence failures.
+- Files changed
+  - services/dataService.ts
+  - components/RadarCard.tsx
+- Assumptions made (if any)
+  - Treated this request as an ad-hoc hardening change not mapped to a PRD story, so prd.json remains unchanged.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+  - Skipped lint/tests (no scripts in package.json).
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None.
+---
