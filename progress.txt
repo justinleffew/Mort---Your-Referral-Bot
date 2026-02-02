@@ -312,6 +312,21 @@
   - components/RadarCard.tsx
 - Assumptions made (if any)
   - Treated this request as an ad-hoc hardening change not mapped to a PRD story, so prd.json remains unchanged.
+## 2026-02-02 16:09 - ADHOC-SUPABASE-DEMO-READY
+- What was implemented
+  - Documented that the demo URL is already allowlisted for edge function CORS and reiterated that setting MORT_PRODUCTION_ORIGINS keeps the runtime list aligned.
+- Files changed
+  - DEPLOY.md
+- Assumptions made (if any)
+  - Treated https://mort-your-referral-bot.vercel.app as the demo URL referenced by the request.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None.
 ## 2026-02-02 16:11 - US-003
 - What was implemented
   - Added an offline/demo fallback for Run Now opportunities using eligible contacts, local scoring, and deterministic message variants when Supabase/session is unavailable.
