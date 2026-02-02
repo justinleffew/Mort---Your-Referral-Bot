@@ -725,8 +725,18 @@ export const dataService = {
 
   updateRadarState: async (contactId: string, data: Partial<RadarState>) => {
     const supabase = getSupabaseClient();
-    const userId = await requireSupabaseUserId(supabase, 'update radar state');
-    if (supabase && userId) {
+    if (supabase) {
+      let userId: string | null = null;
+      try {
+        userId = await requireSupabaseUserId(supabase, 'update radar state');
+      } catch (error) {
+        console.warn('Skipping radar state update without an authenticated Supabase user.', error);
+        return;
+      }
+      if (!userId) {
+        console.warn('Skipping radar state update without an authenticated Supabase user.');
+        return;
+      }
       // Supabase mode.
       const { data: existing, error: loadError } = await supabase
         .from('radar_state')
