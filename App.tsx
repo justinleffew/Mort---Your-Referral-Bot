@@ -360,21 +360,21 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-surface border border-border rounded-[2.5rem] p-6 mb-8 flex items-center justify-end shadow-2xl">
-        <button 
-          onClick={() => setShowAddMenu(true)}
-          className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:scale-95 transition-transform"
-        >
-          <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        </button>
-      </div>
-
       <div className="flex justify-between items-center mb-6 px-2">
           <div>
             <h1 className="text-2xl font-black text-foreground uppercase tracking-tighter">This week&apos;s opportunities</h1>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{UI_LABELS.cadence}: {cadenceLabel}</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowAddMenu(true)}
+              className="h-10 w-10 rounded-full bg-primary text-white shadow-[0_10px_20px_rgba(37,99,235,0.25)] active:scale-95 transition-transform"
+              aria-label="Add contact"
+            >
+              <svg className="h-5 w-5 mx-auto" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+              </svg>
+            </button>
             <button
               onClick={handleRunNow}
               disabled={runNowLoading}
