@@ -321,7 +321,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 pb-24">
+    <div className="max-w-2xl mx-auto px-4 pt-2 pb-24">
       {/* Selection Modal */}
       {showAddMenu && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
@@ -360,7 +360,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="flex justify-end mb-8">
+      <div className="flex justify-end mb-4">
           <button
             onClick={() => setShowAddMenu(true)}
             className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:scale-95 transition-transform"
@@ -1783,6 +1783,7 @@ const ContactsList: React.FC = () => {
 const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignOut }) => {
     const [profile, setProfile] = useState<RealtorProfile>(DEFAULT_PROFILE);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
     const [userEmail, setUserEmail] = useState<string>('');
     const supabase = getSupabaseClient();
 
@@ -1807,12 +1808,14 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
 
     const save = async () => {
         setSaveError(null);
+        setSaveSuccess(null);
         try {
-            await dataService.saveProfile(profile);
-            alert('Settings Saved');
+            const savedProfile = await dataService.saveProfile(profile);
+            setProfile(savedProfile);
+            setSaveSuccess('Saved');
         } catch (error) {
             console.warn('Failed to save settings', error);
-            setSaveError('Save failed. Please retry.');
+            setSaveError(error instanceof Error ? error.message : 'Save failed. Please retry.');
         }
     };
 
@@ -1912,9 +1915,11 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
                 </section>
                 <section className="bg-surface border border-border p-8 rounded-[2.5rem] space-y-4">
                    <h2 className="text-xs font-black text-muted-foreground uppercase tracking-widest">AI Engine</h2>
-                   <p className="text-xs text-muted-foreground leading-relaxed">
-                        AI requests are handled through the app account. There is no user-facing API key to manage.
-                   </p>
+                   {saveSuccess && (
+                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+                       {saveSuccess}
+                     </div>
+                   )}
                    {saveError && (
                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
                        {saveError}
@@ -1959,16 +1964,9 @@ const BottomNav: React.FC = () => {
 const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
     return (
         <div className="min-h-screen bg-app text-foreground">
-            <header className="px-8 py-6 flex items-center justify-between max-w-2xl mx-auto">
+            <header className="px-6 py-4 flex items-center max-w-2xl mx-auto">
                 <Link to="/" className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
-                </Link>
-                <Link
-                    to="/commute"
-                    className="inline-flex items-center gap-2 rounded-full border border-primary/30 px-4 py-2 text-xs font-black uppercase tracking-widest text-primary hover:bg-secondary"
-                >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    Add
                 </Link>
             </header>
             <main className="relative z-0">

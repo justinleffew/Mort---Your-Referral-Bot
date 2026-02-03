@@ -57,7 +57,7 @@ Deno.serve(async req => {
     });
   }
 
-  let payload: { prompt?: string };
+  let payload: { prompt?: string; temperature?: number };
   try {
     payload = await req.json();
   } catch {
@@ -88,6 +88,8 @@ Deno.serve(async req => {
         model: OPENAI_MODEL,
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
+        temperature:
+          typeof payload.temperature === 'number' ? payload.temperature : undefined,
       }),
     });
 

@@ -452,3 +452,27 @@
     - Edge function requests can be centralized to enforce auth headers consistently.
   - Gotchas
     - None observed.
+## 2026-02-03 03:38 - ADHOC-DEMO-FIXES
+- What was implemented
+  - Removed the header-level Add button, tightened main-page spacing, and lifted the primary add FAB.
+  - Simplified Preferences copy, added save success feedback, and hardened profile saves with auth/session checks and detailed Supabase error logging.
+  - Hardened brain dump parsing prompts, enforced JSON schema normalization, sanitized names, and added a realtor_profiles user_id uniqueness migration.
+- Files changed
+  - App.tsx
+  - services/dataService.ts
+  - services/openaiService.ts
+  - supabase/functions/mort-openai/index.ts
+  - supabase/migrations/20250313120000_realtor_profiles_user_id_unique.sql
+  - progress.txt
+- Assumptions made (if any)
+  - Treated the main Run Now opportunities view in App.tsx as the “main page” referenced in the demo request.
+  - Added a migration to enforce realtor_profiles.user_id uniqueness even if the column already exists.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None.
+---
