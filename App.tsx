@@ -7,7 +7,7 @@ import MortgageAssist from './components/MortgageAssist';
 import CommuteMode from './components/CommuteMode';
 import AuthPanel from './components/AuthPanel';
 import { dataService } from './services/dataService';
-import { getSupabaseClient } from './services/supabaseClient';
+import { getSupabaseClient, getSupabaseConfig } from './services/supabaseClient';
 import { formatShortDate, getNextTouchDate, getNextTouchStatus } from './utils/cadence';
 import { UI_LABELS } from './utils/uiLabels';
 import {
@@ -26,12 +26,12 @@ import {
 const DEFAULT_CADENCE_DAYS = 90;
 const DEFAULT_PROFILE: RealtorProfile = {
   name: 'Agent',
-  cadence_type: 'quarterly',
+  cadence: 'quarterly',
   cadence_custom_days: DEFAULT_CADENCE_DAYS,
 };
 
 const getCadenceDays = (profile?: RealtorProfile) => {
-  const cadenceType = profile?.cadence_type ?? DEFAULT_PROFILE.cadence_type;
+  const cadenceType = profile?.cadence ?? profile?.cadence_type ?? DEFAULT_PROFILE.cadence;
   if (cadenceType === 'weekly') return 7;
   if (cadenceType === 'monthly') return 30;
   if (cadenceType === 'custom') {
@@ -42,7 +42,7 @@ const getCadenceDays = (profile?: RealtorProfile) => {
 };
 
 const getCadenceLabel = (profile?: RealtorProfile, cadenceDays?: number) => {
-  const cadenceType = profile?.cadence_type ?? DEFAULT_PROFILE.cadence_type;
+  const cadenceType = profile?.cadence ?? profile?.cadence_type ?? DEFAULT_PROFILE.cadence;
   if (cadenceType === 'weekly') return 'Weekly';
   if (cadenceType === 'monthly') return 'Monthly';
   if (cadenceType === 'custom') {
@@ -1800,15 +1800,48 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
         })();
     }, [supabase]);
 
+    const isSchemaCacheError = (error: unknown) => {
+        const err = error as { message?: string; details?: string; hint?: string; code?: string };
+        const message = `${err?.message ?? ''} ${err?.details ?? ''} ${err?.hint ?? ''}`.toLowerCase();
+        const code = err?.code?.toLowerCase?.() ?? '';
+        return message.includes('schema cache') || message.includes('pgrst204') || code === 'pgrst204';
+    };
+
     const save = async () => {
         setSaveError(null);
         setSaveSuccess(null);
+        const attemptSave = () =>
+            dataService.saveRealtorPreferences({
+                name: profile.name,
+                cadence: profile.cadence ?? profile.cadence_type ?? DEFAULT_PROFILE.cadence,
+                cadenceCustomDays: profile.cadence === 'custom' ? profile.cadence_custom_days ?? null : null,
+                headshot: profile.headshot ?? null,
+            });
         try {
-            const savedProfile = await dataService.saveProfile(profile);
+            const savedProfile = await attemptSave();
             setProfile(savedProfile);
             setSaveSuccess('Saved');
         } catch (error) {
-            console.warn('Failed to save settings', error);
+            if (isSchemaCacheError(error)) {
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    const savedProfile = await attemptSave();
+                    setProfile(savedProfile);
+                    setSaveSuccess('Saved');
+                    return;
+                } catch (retryError) {
+                    error = retryError;
+                }
+            }
+            console.error('prefs save error', error);
+            if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+                setSaveError('Sign in required.');
+                return;
+            }
+            if (isSchemaCacheError(error)) {
+                setSaveError('Database schema just changed. Refresh the page and try again.');
+                return;
+            }
             setSaveError(error instanceof Error ? error.message : 'Save failed. Please retry.');
         }
     };
@@ -1839,14 +1872,11 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
     ] as const;
 
     const handleCadenceChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-      const nextType = event.target.value as RealtorProfile['cadence_type'];
+      const nextType = event.target.value as RealtorProfile['cadence'];
       setProfile(prev => ({
         ...prev,
-        cadence_type: nextType,
-        cadence_custom_days:
-          nextType === 'custom'
-            ? prev.cadence_custom_days ?? 30
-            : prev.cadence_custom_days ?? DEFAULT_CADENCE_DAYS,
+        cadence: nextType,
+        cadence_custom_days: nextType === 'custom' ? prev.cadence_custom_days ?? 30 : null,
       }));
     };
 
@@ -1879,7 +1909,7 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
                    </p>
                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Plan</label>
                    <select
-                      value={profile.cadence_type ?? DEFAULT_PROFILE.cadence_type}
+                      value={profile.cadence ?? profile.cadence_type ?? DEFAULT_PROFILE.cadence}
                       onChange={handleCadenceChange}
                       className="w-full bg-muted border border-border rounded-xl p-3 text-foreground text-sm"
                     >
@@ -1889,7 +1919,7 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
                         </option>
                       ))}
                    </select>
-                   {profile.cadence_type === 'custom' && (
+                   {profile.cadence === 'custom' && (
                       <div className="space-y-2">
                         <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Custom days</label>
                         <input
@@ -1908,7 +1938,7 @@ const Settings: React.FC<{ onSignOut: () => Promise<void> | void }> = ({ onSignO
                    )}
                 </section>
                 <section className="bg-surface border border-border p-8 rounded-[2.5rem] space-y-4">
-                   <h2 className="text-xs font-black text-muted-foreground uppercase tracking-widest">AI Engine</h2>
+                   <h2 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Preferences</h2>
                    {saveSuccess && (
                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
                        {saveSuccess}
@@ -2012,6 +2042,13 @@ const AuthCallback: React.FC = () => {
 export default function App() {
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      const cfg = getSupabaseConfig();
+      console.log('[supabase] url', cfg.supabaseUrl);
+    }
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
