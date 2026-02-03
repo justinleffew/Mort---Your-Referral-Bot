@@ -136,7 +136,7 @@ export const generateRadarMessage = async (
 
         Client: ${contact.full_name}
         Interests: ${interestsText}
-        Family: ${contact.family_details.children.join(', ')}
+        Family: ${(contact.family_details?.children || []).join(', ')}
         Notes (recent first): ${notesText || 'None'}
         ${eventContext}
         ${mortgageContext}
@@ -353,8 +353,8 @@ const formatContactSummary = (contact: Contact) => {
         contact.segment ? `Segment: ${contact.segment}` : null,
         contact.tags?.length ? `Tags: ${contact.tags.join(', ')}` : null,
         contact.radar_interests.length ? `Interests: ${contact.radar_interests.join(', ')}` : null,
-        contact.family_details.children.length ? `Children: ${contact.family_details.children.join(', ')}` : null,
-        contact.family_details.pets.length ? `Pets: ${contact.family_details.pets.join(', ')}` : null,
+        contact.family_details?.children?.length ? `Children: ${contact.family_details.children.join(', ')}` : null,
+        contact.family_details?.pets?.length ? `Pets: ${contact.family_details.pets.join(', ')}` : null,
         contact.sale_date ? `Sale date: ${contact.sale_date}` : null,
         contact.last_contacted_at ? `Last contacted: ${contact.last_contacted_at}` : null,
     ].filter(Boolean);
