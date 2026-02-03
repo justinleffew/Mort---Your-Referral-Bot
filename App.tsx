@@ -185,7 +185,6 @@ const Dashboard: React.FC = () => {
   const [cadenceDays, setCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
   const [cadenceLabel, setCadenceLabel] = useState(getCadenceLabel(DEFAULT_PROFILE));
   const [runNowOpportunities, setRunNowOpportunities] = useState<Opportunity[]>([]);
-  const [runNowError, setRunNowError] = useState<string | null>(null);
   const [selectedMessages, setSelectedMessages] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
@@ -256,11 +255,11 @@ const Dashboard: React.FC = () => {
           }
         });
         setSelectedMessages(defaults);
-        setRunNowError(null);
       } catch (error) {
-        console.warn('Run Now failed', error);
+        // Silently handle error - user doesn't need to see this
+        console.warn('Run Now failed (will retry automatically)', error);
         if (!cancelled) {
-          setRunNowError('Run Now failed. Please retry.');
+          setRunNowOpportunities([]);
         }
       }
     };
@@ -331,10 +330,10 @@ const Dashboard: React.FC = () => {
         }
       });
       setSelectedMessages(defaults);
-      setRunNowError(null);
     } catch (error) {
-      console.warn('Run Now failed', error);
-      setRunNowError('Run Now failed. Please retry.');
+      // Silently handle error - user doesn't need to see this
+      console.warn('Run Now failed (will retry automatically)', error);
+      setRunNowOpportunities([]);
     }
   };
 
@@ -397,12 +396,6 @@ const Dashboard: React.FC = () => {
           </div>
           <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{dueThisWeekCount} Due</span>
       </div>
-
-      {runNowError && (
-        <div className="mx-2 mb-6 text-xs text-amber-600 font-bold uppercase tracking-widest">
-          {runNowError}
-        </div>
-      )}
 
       {runNowOpportunities.length > 0 && (
         <div className="space-y-4 mb-10">

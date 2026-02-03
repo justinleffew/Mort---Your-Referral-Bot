@@ -16,12 +16,28 @@ export const invokeEdgeFunction = async <TResponse, TBody>({
     throw new Error('Supabase is not configured.');
   }
 
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    throw new Error('Unable to check authentication status.');
+  // Get session and refresh if needed to ensure we have a valid token
+  let session = (await supabase.auth.getSession()).data.session;
+
+  // If no session, user needs to sign in
+  if (!session) {
+    throw new Error(AUTH_REQUIRED_MESSAGE);
   }
-  if (!sessionData?.session) {
-    throw new Error('Authentication required to call edge functions.');
+
+  // Check if token is about to expire (within 60 seconds) or already expired
+  const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+  const now = Date.now();
+  const tokenExpiresInMs = expiresAt - now;
+
+  // Refresh if token expires in less than 60 seconds or is already expired
+  if (tokenExpiresInMs < 60000) {
+    console.log('Token expiring soon or expired, refreshing session...');
+    const { data, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !data.session) {
+      console.error('Failed to refresh session:', refreshError);
+      throw new Error(AUTH_REQUIRED_MESSAGE);
+    }
+    session = data.session;
   }
 
   const { supabaseAnonKey } = getSupabaseConfig();
@@ -32,7 +48,7 @@ export const invokeEdgeFunction = async <TResponse, TBody>({
   const { data, error } = await supabase.functions.invoke(functionName, {
     body: body ?? {},
     headers: {
-      Authorization: `Bearer ${sessionData.session.access_token}`,
+      Authorization: `Bearer ${session.access_token}`,
       apikey: supabaseAnonKey,
     },
   });
