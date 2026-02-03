@@ -118,20 +118,14 @@ const PlaybookPanel: React.FC = () => {
 
   return (
     <>
-      <div className="bg-surface border border-border rounded-[2.5rem] p-6 shadow-2xl">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground">Playbooks</p>
-            <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Copy-ready scripts</h3>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowPlaybooks(true)}
-            className="text-xs font-black uppercase tracking-[0.2em] text-primary border border-primary/40 px-4 py-2 rounded-full hover:bg-secondary transition-colors"
-          >
-            View scripts
-          </button>
-        </div>
+      <div className="flex justify-start px-2">
+        <button
+          type="button"
+          onClick={() => setShowPlaybooks(true)}
+          className="text-xs font-black uppercase tracking-[0.2em] text-primary border border-primary/40 px-6 py-3 rounded-full hover:bg-secondary transition-colors"
+        >
+          Copy Ready Scripts
+        </button>
       </div>
       {showPlaybooks && (
         <div className="fixed inset-0 z-[120] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
@@ -369,6 +363,10 @@ const Dashboard: React.FC = () => {
           </button>
       </div>
 
+      <div className="mb-6">
+        <PlaybookPanel />
+      </div>
+
       <div className="flex justify-between items-center mb-6 px-2">
           <div>
             <h1 className="text-2xl font-black text-foreground uppercase tracking-tighter">This week&apos;s opportunities</h1>
@@ -490,10 +488,6 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="mb-10">
-        <PlaybookPanel />
-      </div>
-      
       {radarItems.length === 0 ? (
         <div className="text-center py-16 px-6">
           <div className="relative w-40 h-40 mx-auto mb-10">
