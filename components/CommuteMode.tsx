@@ -315,12 +315,22 @@ const CommuteMode: React.FC = () => {
             return;
         }
 
-        if (audioRef.current) {
-            audioRef.current.src = audioUrl;
-            audioRef.current.play().catch((error) => {
-                console.error('Audio playback failed', error);
-                setTtsError('Audio playback was blocked. Showing text only.');
-            });
+        const audio = audioRef.current;
+        if (audio) {
+            const handleCanPlay = () => {
+                audio.play().catch((error) => {
+                    console.error('Audio playback failed', error);
+                    setTtsError('Audio playback was blocked. Showing text only.');
+                });
+            };
+            audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
+            audio.src = audioUrl;
+            audio.load();
+
+            return () => {
+                audio.removeEventListener('canplaythrough', handleCanPlay);
+                URL.revokeObjectURL(audioUrl);
+            };
         }
 
         return () => {
@@ -537,9 +547,9 @@ const CommuteMode: React.FC = () => {
                     </div>
                 )}
                 <button
-                    disabled={!(transcript.trim() || conversationTranscript.trim()) || isProcessing}
+                    disabled={(!transcript && !conversationTranscript) || isProcessing}
                     onClick={handleProcess}
-                    className={`w-full py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-xl transition-all shadow-2xl ${(transcript.trim() || conversationTranscript.trim()) && !isProcessing ? 'bg-primary text-white active:scale-95' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
+                    className={`w-full py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-xl transition-all shadow-2xl ${(transcript || conversationTranscript) && !isProcessing ? 'bg-primary text-white active:scale-95' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
                 >
                     {isProcessing ? "Processing Voice Memo..." : `Save to ${UI_LABELS.radar}`}
                 </button>
