@@ -190,7 +190,84 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    void refreshRadar();
+    let cancelled = false;
+    const loadData = async () => {
+      const profile = await dataService.getProfile();
+      const cadenceDaysValue = getCadenceDays(profile);
+      if (cancelled) return;
+      setCadenceDays(cadenceDaysValue);
+      setCadenceLabel(getCadenceLabel(profile, cadenceDaysValue));
+      const [eligible, contacts, radarStates] = await Promise.all([
+        dataService.getEligibleContacts(),
+        dataService.getContacts(),
+        dataService.getRadarStates(),
+      ]);
+      if (cancelled) return;
+      setContactsCount(contacts.length);
+      setSampleSeeded(dataService.hasSeededSampleContacts());
+      const limitedEligible = eligible.slice(0, 5);
+      const items = await Promise.all(
+        limitedEligible.map(async contact => {
+          const [notes, state] = await Promise.all([
+            dataService.getNotes(contact.id),
+            dataService.getRadarState(contact.id),
+          ]);
+          return {
+            contact,
+            notes,
+            state: state ?? {
+              id: crypto.randomUUID(),
+              contact_id: contact.id,
+              user_id: contact.user_id,
+              reached_out: false,
+              angles_used_json: [],
+            },
+          };
+        })
+      );
+      if (cancelled) return;
+      setRadarItems(items);
+      const today = new Date();
+      const endOfWeek = new Date();
+      endOfWeek.setDate(today.getDate() + 7);
+      const dueThisWeek = contacts.filter(contact => {
+        if (contact.archived) return false;
+        const state = radarStates.find(r => r.contact_id === contact.id);
+        if (state?.suppressed_until && new Date(state.suppressed_until) > endOfWeek) return false;
+        if (contact.suggested_action && !state?.last_prompt_shown_at) return true;
+
+        const baseDateValue = contact.last_contacted_at || contact.sale_date;
+        if (!baseDateValue) return true;
+        const baseDate = new Date(baseDateValue);
+        if (Number.isNaN(baseDate.getTime())) return true;
+        const dueDate = new Date(baseDate);
+        dueDate.setDate(dueDate.getDate() + cadenceDaysValue);
+        return dueDate <= endOfWeek;
+      }).length;
+      setDueThisWeekCount(dueThisWeek);
+      try {
+        const opportunities = await dataService.runNowOpportunities();
+        if (cancelled) return;
+        setRunNowOpportunities(opportunities);
+        const defaults: Record<string, string> = {};
+        opportunities.forEach(opportunity => {
+          if (opportunity.suggested_messages?.length) {
+            defaults[opportunity.id] = opportunity.suggested_messages[0];
+          }
+        });
+        setSelectedMessages(defaults);
+        setRunNowError(null);
+      } catch (error) {
+        console.warn('Run Now failed', error);
+        if (!cancelled) {
+          setRunNowError('Run Now failed. Please retry.');
+        }
+      }
+    };
+    void loadData();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const refreshRadar = async () => {
@@ -1345,17 +1422,20 @@ const EditContact: React.FC = () => {
 
     useEffect(() => {
         if (!id) return;
+        let cancelled = false;
         void (async () => {
             const data = await dataService.getContactById(id);
-            if (data) {
-                setContact(data);
-                const nameParts = data.full_name?.trim().split(/\s+/) ?? [];
-                setFirstName(nameParts[0] ?? '');
-                setLastName(nameParts.slice(1).join(' '));
-                setSelectedTags(data.tags || []);
-                setInterestsDraft((data.radar_interests || []).join(', '));
-            }
+            if (cancelled || !data) return;
+            setContact(data);
+            const nameParts = data.full_name?.trim().split(/\s+/) ?? [];
+            setFirstName(nameParts[0] ?? '');
+            setLastName(nameParts.slice(1).join(' '));
+            setSelectedTags(data.tags || []);
+            setInterestsDraft((data.radar_interests || []).join(', '));
         })();
+        return () => {
+            cancelled = true;
+        };
     }, [id]);
 
     const handleToggleTag = (value: string) => {
@@ -1457,12 +1537,54 @@ const EditContact: React.FC = () => {
                 </div>
                 <div>
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Phone</label>
-                    <input 
-                        type="tel" 
-                        value={formatPhone(contact.phone || '')} 
-                        onChange={e => setContact({ ...contact, phone: normalizePhone(e.target.value) })} 
-                        className={InputStyle} 
+                    <input
+                        type="tel"
+                        value={formatPhone(contact.phone || '')}
+                        onChange={e => setContact({ ...contact, phone: normalizePhone(e.target.value) })}
+                        className={InputStyle}
                         placeholder="(555) 000-0000"
+                        autoComplete="off"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Birthday</label>
+                    <input
+                        type="date"
+                        value={contact.birthday || ''}
+                        onChange={e => setContact({ ...contact, birthday: e.target.value })}
+                        className={InputStyle}
+                        autoComplete="off"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Location</label>
+                    <input
+                        type="text"
+                        value={contact.location_context || ''}
+                        onChange={e => setContact({ ...contact, location_context: e.target.value })}
+                        className={InputStyle}
+                        placeholder="Dublin, Ohio"
+                        autoComplete="off"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Property Address</label>
+                    <input
+                        type="text"
+                        value={contact.property_address || ''}
+                        onChange={e => setContact({ ...contact, property_address: e.target.value })}
+                        className={InputStyle}
+                        placeholder="123 Main St, Dublin, OH 43016"
+                        autoComplete="off"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Date of Sale</label>
+                    <input
+                        type="date"
+                        value={contact.sale_date || ''}
+                        onChange={e => setContact({ ...contact, sale_date: e.target.value })}
+                        className={InputStyle}
                         autoComplete="off"
                     />
                 </div>
@@ -1935,7 +2057,6 @@ const BottomNav: React.FC = () => {
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-2xl border-t border-border px-8 py-4 flex justify-between items-center max-w-2xl mx-auto rounded-t-[3rem] shadow-[0_-10px_30px_rgba(15,23,42,0.08)]">
             <Link to="/" className={navItemClass('/')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 9.5V21h5v-6h5v6h5V9.5L12 2z"/></svg><span className="text-xs font-black uppercase tracking-tighter">{UI_LABELS.radar}</span></Link>
-            <Link to="/actions" className={navItemClass('/actions')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12h3l3 8 4-16 3 8h5" /></svg><span className="text-xs font-black uppercase tracking-tighter">Actions</span></Link>
             <Link to="/mort" className={navItemClass('/mort')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg><span className="text-xs font-black uppercase tracking-tighter">{UI_LABELS.assistant}</span></Link>
             <Link to="/contacts" className={navItemClass('/contacts')}><svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span className="text-xs font-black uppercase tracking-tighter">Contacts</span></Link>
             <Link to="/settings" className={navItemClass('/settings')}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg><span className="text-xs font-black uppercase tracking-tighter">Prefs</span></Link>
@@ -2106,6 +2227,8 @@ export default function App() {
   const handleSignOut = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
+    // Navigate to root to show sign-in screen
+    window.location.hash = '/';
   };
 
   return (
@@ -2114,7 +2237,6 @@ export default function App() {
         <Layout>
             <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/actions" element={<DailyActions />} />
                 <Route path="/mort" element={<div className="max-w-2xl mx-auto h-[calc(100vh-140px)] p-4"><MortgageAssist /></div>} />
                 <Route path="/commute" element={<CommuteMode />} />
                 <Route path="/contacts" element={<ContactsList />} />

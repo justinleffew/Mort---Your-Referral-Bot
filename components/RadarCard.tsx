@@ -22,6 +22,7 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
     const [copyError, setCopyError] = useState<string | null>(null);
     const [touchError, setTouchError] = useState<string | null>(null);
     const messageRef = useRef<HTMLTextAreaElement | null>(null);
+    const isMountedRef = useRef(true);
     const nextTouchDate = getNextTouchDate(contact);
     const nextTouchStatus = getNextTouchStatus(nextTouchDate);
 
@@ -38,17 +39,24 @@ const RadarCard: React.FC<RadarCardProps> = ({ contact, notes, state, onReachedO
     }[nextTouchStatus];
 
     useEffect(() => {
+        isMountedRef.current = true;
         loadPrompt();
+        return () => {
+            isMountedRef.current = false;
+        };
     }, [contact.id]);
 
     const loadPrompt = async (forceRefresh = false) => {
-        setLoading(true);
-        const usedAngles = forceRefresh 
-            ? [...state.angles_used_json.map(a => a.angle), generated?.angle || ''] 
+        if (isMountedRef.current) {
+            setLoading(true);
+        }
+        const usedAngles = forceRefresh
+            ? [...state.angles_used_json.map(a => a.angle), generated?.angle || '']
             : state.angles_used_json.map(a => a.angle);
-            
+
         const angle = determineAngle(contact, notes, usedAngles as any);
         const result = await generateRadarMessage(contact, angle, notes);
+        if (!isMountedRef.current) return;
         setGenerated(result);
         setEditedMessage(result.message);
         setLoading(false);

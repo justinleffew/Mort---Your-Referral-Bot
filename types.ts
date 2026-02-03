@@ -19,6 +19,8 @@ export interface Contact {
   phone?: string;
   email?: string;
   location_context?: string;
+  property_address?: string;
+  birthday?: string; // ISO date string
   sale_date?: string; // ISO date string
   last_contacted_at?: string; // ISO date string
   segment?: string;

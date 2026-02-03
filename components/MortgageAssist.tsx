@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { generateMortgageResponse } from '../services/openaiService';
 import { MortgageQueryResponse } from '../types';
 
@@ -9,13 +9,23 @@ const MortgageAssist: React.FC<MortgageAssistProps> = () => {
     const [response, setResponse] = useState<MortgageQueryResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [copiedSection, setCopiedSection] = useState<string | null>(null);
+    const isMountedRef = useRef(true);
+
+    useEffect(() => {
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!query.trim()) return;
         setLoading(true);
         const res = await generateMortgageResponse(query);
-        setResponse(res);
-        setLoading(false);
+        if (isMountedRef.current) {
+            setResponse(res);
+            setLoading(false);
+        }
     };
 
     const headerLabel = 'Mortgage Assist';
