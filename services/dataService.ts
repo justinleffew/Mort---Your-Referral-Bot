@@ -643,6 +643,63 @@ export const dataService = {
     }
   },
 
+  deleteContact: async (id: string) => {
+    const supabase = getSupabaseClient();
+    const userId = await getSupabaseUserId(supabase);
+    if (supabase && userId) {
+      // Supabase mode - delete contact and related data.
+      const { error: radarError } = await supabase
+        .from('radar_state')
+        .delete()
+        .eq('contact_id', id)
+        .eq('user_id', userId);
+      if (radarError) {
+        console.warn('Failed to delete radar state', radarError);
+      }
+
+      const { error: notesError } = await supabase
+        .from('contact_notes')
+        .delete()
+        .eq('contact_id', id);
+      if (notesError) {
+        console.warn('Failed to delete contact notes', notesError);
+      }
+
+      const { error: touchesError } = await supabase
+        .from('touches')
+        .delete()
+        .eq('contact_id', id)
+        .eq('user_id', userId);
+      if (touchesError) {
+        console.warn('Failed to delete touches', touchesError);
+      }
+
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+      if (error) {
+        console.warn('Failed to delete contact', error);
+        throw new Error(formatSupabaseError('delete contact', error));
+      }
+      return;
+    }
+
+    // LocalStorage fallback.
+    const contacts = load<Contact>(STORAGE_KEYS.CONTACTS);
+    save(STORAGE_KEYS.CONTACTS, contacts.filter(c => c.id !== id));
+
+    const notes = load<ContactNote>(STORAGE_KEYS.NOTES);
+    save(STORAGE_KEYS.NOTES, notes.filter(n => n.contact_id !== id));
+
+    const radarStates = load<RadarState>(STORAGE_KEYS.RADAR);
+    save(STORAGE_KEYS.RADAR, radarStates.filter(r => r.contact_id !== id));
+
+    const touches = load<Touch>(STORAGE_KEYS.TOUCHES);
+    save(STORAGE_KEYS.TOUCHES, touches.filter(t => t.contact_id !== id));
+  },
+
   getNotes: async (contactId: string): Promise<ContactNote[]> => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);

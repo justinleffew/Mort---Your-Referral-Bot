@@ -176,7 +176,6 @@ const PlaybookPanel: React.FC = () => {
 
 const Dashboard: React.FC = () => {
   const [radarItems, setRadarItems] = useState<Array<{ contact: Contact; notes: ContactNote[]; state: RadarState }>>([]);
-  const [stats, setStats] = useState({ total: 0, withInterests: 0, percent: 0 });
   const [contactsCount, setContactsCount] = useState(0);
   const [sampleSeeded, setSampleSeeded] = useState(dataService.hasSeededSampleContacts());
   const [sampleSeeding, setSampleSeeding] = useState(false);
@@ -245,8 +244,6 @@ const Dashboard: React.FC = () => {
       return dueDate <= endOfWeek;
     }).length;
     setDueThisWeekCount(dueThisWeek);
-    const latestStats = await dataService.getStats();
-    setStats(latestStats);
   };
 
   const handleReachedOut = async (contactId: string) => {
@@ -363,19 +360,10 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-surface border border-border rounded-[2.5rem] p-6 mb-8 flex items-center justify-between shadow-2xl">
-          <div className="flex-1">
-            <h4 className="text-xs font-black text-muted-foreground uppercase tracking-[0.3em] mb-2">{UI_LABELS.radar} Coverage</h4>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${stats.percent}%` }}></div>
-              </div>
-              <span className="text-xl font-black text-foreground">{stats.percent}%</span>
-            </div>
-          </div>
-          <button 
+      <div className="flex justify-end mb-8">
+          <button
             onClick={() => setShowAddMenu(true)}
-            className="ml-6 w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:scale-95 transition-transform"
+            className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:scale-95 transition-transform"
           >
             <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           </button>
@@ -836,6 +824,8 @@ const ContactDetail: React.FC = () => {
     const [cadenceSelection, setCadenceSelection] = useState<number>(DEFAULT_CADENCE_DAYS);
     const [customCadence, setCustomCadence] = useState<string>('');
     const [activityError, setActivityError] = useState<string | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         if (!id) return;
@@ -983,6 +973,20 @@ const ContactDetail: React.FC = () => {
         }
     };
 
+    const handleDeleteContact = async () => {
+        setActivityError(null);
+        setIsDeleting(true);
+        try {
+            await dataService.deleteContact(contact.id);
+            navigate('/contacts');
+        } catch (error) {
+            console.warn('Failed to delete contact', error);
+            setActivityError('Delete failed. Please retry.');
+            setIsDeleting(false);
+            setShowDeleteConfirm(false);
+        }
+    };
+
     const timelineItems = [
         ...touches.map(touch => ({
             id: `touch-${touch.id}`,
@@ -1002,13 +1006,44 @@ const ContactDetail: React.FC = () => {
 
     return (
         <div className="max-w-md mx-auto p-6 space-y-8 pb-32">
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 animate-in fade-in duration-200">
+                    <div className="bg-surface border border-border rounded-3xl p-8 max-w-sm w-full shadow-2xl space-y-6">
+                        <h3 className="text-xl font-black text-foreground uppercase tracking-tight text-center">Delete Contact?</h3>
+                        <p className="text-muted-foreground text-sm text-center">
+                            This will permanently delete {contact.full_name} and all associated notes, touches, and data. This action cannot be undone.
+                        </p>
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleDeleteContact}
+                                disabled={isDeleting}
+                                className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm bg-rose-500 text-white hover:bg-rose-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                disabled={isDeleting}
+                                className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm border border-border text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="flex items-center justify-between mb-4">
                 <button onClick={() => navigate('/contacts')} className="p-2 text-muted-foreground hover:text-foreground">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
                 </button>
-                <button onClick={() => navigate(`/contacts/edit/${contact.id}`)} className="text-primary text-xs font-black uppercase tracking-widest border border-primary/30 px-6 py-2 rounded-full hover:bg-secondary">
-                    Edit
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setShowDeleteConfirm(true)} className="text-rose-500 text-xs font-black uppercase tracking-widest border border-rose-500/30 px-4 py-2 rounded-full hover:bg-rose-500/10">
+                        Delete
+                    </button>
+                    <button onClick={() => navigate(`/contacts/edit/${contact.id}`)} className="text-primary text-xs font-black uppercase tracking-widest border border-primary/30 px-6 py-2 rounded-full hover:bg-secondary">
+                        Edit
+                    </button>
+                </div>
             </div>
             {activityError && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
