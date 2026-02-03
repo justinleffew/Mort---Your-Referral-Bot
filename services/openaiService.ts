@@ -8,7 +8,7 @@ type EdgeFunctionResponse<T> = {
     data?: T;
 };
 
-export const AUTH_REQUIRED_MESSAGE = 'Please sign in to use Mort AI.';
+export const AUTH_REQUIRED_MESSAGE = 'Please sign in again.';
 
 const callOpenAiJson = async <T>(
     prompt: string,
@@ -548,11 +548,12 @@ export const generateMortgageResponse = async (query: string): Promise<MortgageQ
             next_steps: json.next_steps || ''
         };
     } catch (e) {
-        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
-            return { buyer_script: e.message, ballpark_numbers: '', heads_up: '', next_steps: '' };
+        const errorMessage = e instanceof Error ? e.message : 'AI unavailable.';
+        if (errorMessage === AUTH_REQUIRED_MESSAGE) {
+            return { buyer_script: errorMessage, ballpark_numbers: '', heads_up: '', next_steps: '' };
         }
         console.error("Failed to generate mortgage response", e);
-        return { buyer_script: "AI unavailable.", ballpark_numbers: "N/A", heads_up: "N/A", next_steps: "Check settings." };
+        return { buyer_script: errorMessage, ballpark_numbers: '', heads_up: '', next_steps: '' };
     }
 };
 
@@ -594,10 +595,11 @@ export const generateGeneralAssistResponse = async (
             response: json.response || ''
         };
     } catch (e) {
-        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
-            return { response: e.message };
+        const errorMessage = e instanceof Error ? e.message : 'AI unavailable.';
+        if (errorMessage === AUTH_REQUIRED_MESSAGE) {
+            return { response: errorMessage };
         }
         console.error("Failed to generate general assist response", e);
-        return { response: "AI unavailable." };
+        return { response: errorMessage };
     }
 };

@@ -12,7 +12,7 @@ Deno.serve(async req => {
   const origin = req.headers.get('origin');
   const baseHeaders = corsHeaders(origin);
   console.log('mort-openai request', { method: req.method, origin });
-  const authHeader = req.headers.get('authorization');
+  const authHeader = req.headers.get('authorization') ?? '';
 
   const optionsResponse = handleOptions(req);
   if (optionsResponse) {
@@ -35,18 +35,21 @@ Deno.serve(async req => {
     });
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    global: { headers: { Authorization: authHeader ?? '' } },
-  });
-
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-  if (authError || !authData?.user) {
-    console.log('mort-openai unauthorized', { authError });
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...baseHeaders, 'Content-Type': 'application/json' },
-    });
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : '';
+  let userId: string | null = null;
+  if (token) {
+    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authData?.user) {
+      console.log('mort-openai unauthorized', { authError });
+      return new Response(JSON.stringify({ error: 'AUTH_REQUIRED', message: 'Please sign in again.' }), {
+        status: 401,
+        headers: { ...baseHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    userId = authData.user.id;
   }
+  console.log('mort-openai auth resolved', { userId });
 
   const openAiKey = getOpenAiKey();
   if (!openAiKey) {

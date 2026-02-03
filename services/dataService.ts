@@ -27,7 +27,7 @@ const STORAGE_KEYS = {
 };
 
 const STORAGE_VERSION = 'v2';
-const AUTH_REQUIRED_MESSAGE = 'Please sign in to use Mort AI.';
+const AUTH_REQUIRED_MESSAGE = 'Please sign in again.';
 
 type VersionedPayload<T> = {
   version: string;

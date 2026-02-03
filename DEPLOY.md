@@ -39,6 +39,8 @@ supabase functions deploy mort-run-now
 supabase functions deploy mort-news-search
 ```
 
+Note: `supabase/functions/mort-openai/config.toml` sets `verify_jwt = false`. Redeploy `mort-openai` after any config changes so the gateway picks up the new setting.
+
 ## Optional cleanup (remove legacy slugs)
 
 If older function slugs were deployed (`open-ai`, `quick-action`), remove them to avoid confusion. The app must call `/functions/v1/mort-openai`, `/functions/v1/mort-openai-tts`, `/functions/v1/mort-run-now`, and `/functions/v1/mort-news-search`.

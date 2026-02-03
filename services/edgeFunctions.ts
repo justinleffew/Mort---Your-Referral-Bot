@@ -5,6 +5,8 @@ type InvokeOptions<TBody> = {
   body: TBody;
 };
 
+const AUTH_REQUIRED_MESSAGE = 'Please sign in again.';
+
 export const invokeEdgeFunction = async <TResponse, TBody>({
   functionName,
   body,
@@ -35,7 +37,13 @@ export const invokeEdgeFunction = async <TResponse, TBody>({
     },
   });
   if (error) {
-    throw new Error(error.message || `Request failed for ${functionName}`);
+    const status = (error as { status?: number; context?: { status?: number } })?.status
+      ?? (error as { context?: { status?: number } })?.context?.status;
+    const message = error.message || '';
+    if (status === 401 || message.toLowerCase().includes('unauthorized') || message.includes('AUTH_REQUIRED')) {
+      throw new Error(AUTH_REQUIRED_MESSAGE);
+    }
+    throw new Error(message || `Request failed for ${functionName}`);
   }
 
   return (data ?? ({} as TResponse)) as TResponse;
