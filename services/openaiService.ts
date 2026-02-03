@@ -236,6 +236,7 @@ const extractBrainDumpLocally = (transcript: string): BrainDumpClient[] => {
         radar_interests: [...new Set(interests)].slice(0, 5),
         family_details: { children: [], pets: [] },
         mortgage_inference: undefined,
+        suggested_action: '',
         tags: ['Voice Memo'],
     }];
 };
@@ -270,6 +271,9 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
         const data = await callOpenAiJson<{ clients?: BrainDumpClient[] }>(prompt);
         return data.clients || [];
     } catch (e) {
+        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
+            throw e;
+        }
         // If AI fails for any reason, fall back to local extraction
         console.warn("AI processing failed, using local extraction:", e instanceof Error ? e.message : e);
         return extractBrainDumpLocally(transcript);

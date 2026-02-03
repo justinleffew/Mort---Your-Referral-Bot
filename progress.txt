@@ -428,3 +428,27 @@
   - Gotchas
     - Supabase auth-gated features should short-circuit edge function calls when no session exists.
 ---
+---
+## 2026-02-03 09:18 - ADHOC-AUTH-VOICE-MEMO
+- What was implemented
+  - Required authenticated Supabase sessions and explicit auth headers for edge function invokes, and surfaced auth-required errors during voice memo saves.
+  - Added cooldown-based Supabase profile sync disabling with auth reset, and enforced authenticated Supabase writes for voice memo contact saves.
+  - Ensured local brain dump extraction includes required fields and stops on auth-required errors.
+- Files changed
+  - services/edgeFunctions.ts
+  - services/openaiService.ts
+  - components/CommuteMode.tsx
+  - services/dataService.ts
+- Assumptions made (if any)
+  - Treated a 30-second cooldown as a safe temporary disable period for profile sync errors instead of permanent fallback.
+  - Reused the "Please sign in to use Mort AI." string for unauthenticated contact writes to align with existing auth-required messaging.
+  - Assumed voice memo saves should hard-stop on any contact/note write failure instead of partial saves.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+  - Skipped lint/tests (no scripts in package.json)
+- Learnings for future iterations:
+  - Patterns discovered
+    - Edge function requests can be centralized to enforce auth headers consistently.
+  - Gotchas
+    - None observed.
