@@ -598,21 +598,41 @@ export const dataService = {
   },
 
   addBrainDumpClients: async (clients: BrainDumpClient[]) => {
+    let savedCount = 0;
+    let lastError: Error | null = null;
+
     for (const c of clients) {
-      const parsedYear = parseApproxYear(c.transaction_history?.approx_year);
-      const contact = await dataService.addContact({
-        full_name: c.names.join(' & '),
-        location_context: c.location_context,
-        sale_date: parsedYear ? `${parsedYear}-01-01` : undefined,
-        radar_interests: c.radar_interests,
-        family_details: c.family_details,
-        mortgage_inference: c.mortgage_inference,
-        suggested_action: c.suggested_action,
-        tags: c.tags ?? [],
-      });
-      if (c.transaction_history.notes) {
-        await dataService.addNote(contact.id, c.transaction_history.notes);
+      try {
+        const parsedYear = parseApproxYear(c.transaction_history?.approx_year);
+        const contact = await dataService.addContact({
+          full_name: c.names.join(' & '),
+          location_context: c.location_context,
+          sale_date: parsedYear ? `${parsedYear}-01-01` : undefined,
+          radar_interests: c.radar_interests,
+          family_details: c.family_details,
+          mortgage_inference: c.mortgage_inference,
+          suggested_action: c.suggested_action,
+          tags: c.tags ?? [],
+        });
+        savedCount++;
+        if (c.transaction_history?.notes) {
+          try {
+            await dataService.addNote(contact.id, c.transaction_history.notes);
+          } catch (noteError) {
+            console.warn('Failed to add note for contact', contact.id, noteError);
+            // Continue even if note fails
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to save brain dump client', c.names, error);
+        lastError = error instanceof Error ? error : new Error(String(error));
+        // Continue trying to save other clients
       }
+    }
+
+    // If we couldn't save any clients and had errors, throw
+    if (savedCount === 0 && lastError && clients.length > 0) {
+      throw lastError;
     }
   },
 
