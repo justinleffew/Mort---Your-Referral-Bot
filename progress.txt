@@ -476,6 +476,16 @@
   - Gotchas
     - None.
 ---
+## 2026-02-03 03:50 - ADHOC-FOLLOWUP-HIDE
+- What was implemented
+  - Prevented follow-up questions from regenerating after submission and hid the follow-up list until a new recording cycle starts.
+- Files changed
+  - components/CommuteMode.tsx
+- Assumptions made (if any)
+  - Treated the follow-up reset as the conversationTranscript update that immediately follows submission, so suppressing regeneration once keeps questions from reverting to the unanswered state.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
 ## 2026-02-03 03:47 - ADHOC-COPY-READY-BUTTON
 - What was implemented
   - Moved the copy-ready scripts entry above the weekly opportunities header and simplified it to a single "Copy Ready Scripts" button.
@@ -491,5 +501,6 @@
   - Patterns discovered
     - None.
   - Gotchas
+    - None.
     - Playwright screenshot capture failed due to a Chromium crash in the container.
 ---
