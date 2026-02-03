@@ -19,6 +19,7 @@ const CommuteMode: React.FC = () => {
     const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
     const [expandedFollowUps, setExpandedFollowUps] = useState<Record<string, boolean>>({});
     const [submittedFollowUps, setSubmittedFollowUps] = useState<Record<string, boolean>>({});
+    const [hideFollowUpQuestions, setHideFollowUpQuestions] = useState(false);
     const [isRefining, setIsRefining] = useState(false);
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
     const [selectedVoice, setSelectedVoice] = useState<'alloy' | 'nova'>('nova');
@@ -122,6 +123,9 @@ const CommuteMode: React.FC = () => {
         if (isRecordingRef.current) {
             return;
         }
+        if (hideFollowUpQuestions) {
+            setHideFollowUpQuestions(false);
+        }
         const isFollowUpCycle = conversationTranscript.trim().length > 0 && (followUpQuestions.length > 0 || followUpResponse || isRefining);
         setTranscript('');
         latestTranscriptRef.current = '';
@@ -133,6 +137,7 @@ const CommuteMode: React.FC = () => {
             setFollowUpAnswers({});
             setExpandedFollowUps({});
             setSubmittedFollowUps({});
+            setHideFollowUpQuestions(false);
             setIsRefining(false);
         }
         setSpeechError('');
@@ -148,6 +153,10 @@ const CommuteMode: React.FC = () => {
         if (!conversationTranscript.trim()) {
             setFollowUpResponse('');
             setFollowUpQuestions([]);
+            setHideFollowUpQuestions(false);
+            return;
+        }
+        if (hideFollowUpQuestions) {
             return;
         }
 
@@ -214,6 +223,7 @@ const CommuteMode: React.FC = () => {
             return next;
         });
         setExpandedFollowUps({});
+        setHideFollowUpQuestions(true);
     };
 
     useEffect(() => {
@@ -468,7 +478,7 @@ const CommuteMode: React.FC = () => {
                         <p className="mt-3 text-muted-foreground">
                             {followUpResponse || 'Tell me specific details so I can trigger real-time moments.'}
                         </p>
-                        {followUpQuestions.length > 0 && (
+                        {followUpQuestions.length > 0 && !hideFollowUpQuestions && (
                             <div className="mt-3 space-y-3">
                                 <ul className="space-y-2 text-foreground">
                                     {followUpQuestions.map((question) => {
