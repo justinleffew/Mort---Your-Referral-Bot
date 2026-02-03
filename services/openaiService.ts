@@ -14,19 +14,6 @@ const callOpenAiJson = async <T>(
     prompt: string,
     options?: { temperature?: number }
 ): Promise<T> => {
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-        throw new Error('Supabase is not configured.');
-    }
-
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) {
-        throw new Error('Unable to check authentication status.');
-    }
-    if (!sessionData?.session) {
-        throw new Error(AUTH_REQUIRED_MESSAGE);
-    }
-
     const payload = await invokeEdgeFunction<EdgeFunctionResponse<T>, { prompt: string; temperature?: number }>({
         functionName: EDGE_FUNCTIONS.OPENAI,
         body: { prompt, temperature: options?.temperature },
@@ -47,19 +34,6 @@ export const generateSpeechAudio = async (text: string, voice: string): Promise<
     const trimmed = text.trim();
     if (!trimmed) {
         throw new Error('Text is required for speech synthesis.');
-    }
-
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-        throw new Error('Supabase is not configured.');
-    }
-
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) {
-        throw new Error('Unable to check authentication status.');
-    }
-    if (!sessionData?.session) {
-        throw new Error(AUTH_REQUIRED_MESSAGE);
     }
 
     const payload = await invokeEdgeFunction<EdgeFunctionResponse<OpenAiTtsResponse>, { text: string; voice: string }>({
@@ -534,26 +508,22 @@ export const generateBrainDumpFollowUps = async (transcript: string): Promise<{ 
 
 export const generateMortgageResponse = async (query: string): Promise<MortgageQueryResponse> => {
     const prompt = `
-    You are Mort, a conservative, calm mortgage assistant. Talk to the AGENT.
-    Query: "${query}"
-    Output JSON: buyer_script, ballpark_numbers, heads_up, next_steps.
+    You are Mort, a conservative, calm mortgage assistant helping a real estate agent.
+    The agent asks: "${query}"
+
+    Provide a clear, direct answer with practical guidance they can use.
+    Output JSON with a single "response" field containing your answer.
     `;
 
     try {
         const json = await callOpenAiJson<MortgageQueryResponse>(prompt);
         return {
-            buyer_script: json.buyer_script || '',
-            ballpark_numbers: json.ballpark_numbers || '',
-            heads_up: json.heads_up || '',
-            next_steps: json.next_steps || ''
+            response: json.response || 'No response generated.'
         };
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : 'AI unavailable.';
-        if (errorMessage === AUTH_REQUIRED_MESSAGE) {
-            return { buyer_script: errorMessage, ballpark_numbers: '', heads_up: '', next_steps: '' };
-        }
         console.error("Failed to generate mortgage response", e);
-        return { buyer_script: errorMessage, ballpark_numbers: '', heads_up: '', next_steps: '' };
+        return { response: errorMessage };
     }
 };
 

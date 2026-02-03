@@ -19,6 +19,8 @@ export interface Contact {
   phone?: string;
   email?: string;
   location_context?: string;
+  property_address?: string;
+  birthday?: string; // ISO date string
   sale_date?: string; // ISO date string
   last_contacted_at?: string; // ISO date string
   segment?: string;
@@ -74,10 +76,7 @@ export interface Touch {
 }
 
 export interface MortgageQueryResponse {
-  buyer_script: string;
-  ballpark_numbers: string;
-  heads_up: string;
-  next_steps: string;
+  response: string;
 }
 
 export interface GeneralAssistResponse {
