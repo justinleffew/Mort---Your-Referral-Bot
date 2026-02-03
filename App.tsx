@@ -1309,6 +1309,7 @@ const EditContact: React.FC = () => {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [aboutDraft, setAboutDraft] = useState('');
+    const [interestsDraft, setInterestsDraft] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [saveError, setSaveError] = useState<string | null>(null);
     const primaryTagOptions = [
@@ -1352,6 +1353,7 @@ const EditContact: React.FC = () => {
                 setFirstName(nameParts[0] ?? '');
                 setLastName(nameParts.slice(1).join(' '));
                 setSelectedTags(data.tags || []);
+                setInterestsDraft((data.radar_interests || []).join(', '));
             }
         })();
     }, [id]);
@@ -1364,6 +1366,11 @@ const EditContact: React.FC = () => {
         ));
     };
 
+    const parseInterests = (value: string) => value
+        .split(/[;,]/)
+        .map(item => item.trim())
+        .filter(Boolean);
+
     const handleSave = async () => {
         const finalName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
         if (!finalName) {
@@ -1372,11 +1379,13 @@ const EditContact: React.FC = () => {
         }
 
         setSaveError(null);
+
+        const parsedInterests = parseInterests(interestsDraft);
         
         const finalContact = {
             ...contact,
             full_name: finalName,
-            radar_interests: contact.radar_interests || [],
+            radar_interests: parsedInterests,
             tags: selectedTags
         };
 
@@ -1473,6 +1482,18 @@ const EditContact: React.FC = () => {
                                 autoCapitalize="sentences"
                                 rows={3}
                             />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 ml-1">Interests</label>
+                            <input
+                                type="text"
+                                value={interestsDraft}
+                                onChange={e => setInterestsDraft(e.target.value)}
+                                className={InputStyle}
+                                placeholder="Golf, Buckeyes, Home projects"
+                                autoComplete="off"
+                            />
+                            <p className="text-xs text-muted-foreground mt-2">Separate interests with commas or semicolons.</p>
                         </div>
                         <div>
                             <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Primary Tags</label>

@@ -574,6 +574,9 @@ export const dataService = {
       throw new Error(AUTH_REQUIRED_MESSAGE);
     }
     const demoMode = !userId;
+    const normalizedRadarInterests = Array.isArray(data.radar_interests)
+      ? data.radar_interests.filter(Boolean)
+      : [];
     console.info('Add contact request', {
       userId: userId ?? 'none',
       demoMode,
@@ -599,7 +602,7 @@ export const dataService = {
         comfort_level: data.comfort_level || 'maybe',
         archived: false,
         created_at: new Date().toISOString(),
-        radar_interests: data.radar_interests || [],
+        radar_interests: normalizedRadarInterests,
         family_details: data.family_details || { children: [], pets: [] },
         mortgage_inference: data.mortgage_inference,
         suggested_action: data.suggested_action,
@@ -610,6 +613,10 @@ export const dataService = {
       await ensureProfileForUser(userId);
       const fallbackContact = buildContact(userId);
       const supabasePayload = buildSupabaseContactInsertPayload(fallbackContact);
+      if (import.meta.env.DEV) {
+        console.log('[addContact] outgoing radar_interests:', fallbackContact.radar_interests, typeof fallbackContact.radar_interests);
+        console.log('[addContact] payload keys:', Object.keys(supabasePayload));
+      }
       console.info('Supabase add contact insert', {
         table: 'contacts',
         payloadKeys: Object.keys(supabasePayload),
@@ -619,6 +626,9 @@ export const dataService = {
         .insert(supabasePayload)
         .select()
         .single();
+      if (import.meta.env.DEV) {
+        console.log('[addContact] saved radar_interests:', inserted?.radar_interests);
+      }
       if (error) {
         console.warn('Failed to add contact', error);
         throw new Error(formatSupabaseError('add contact', error));
@@ -684,6 +694,9 @@ export const dataService = {
     if (supabase && userId) {
       // Supabase mode.
       const supabasePayload = buildSupabaseContactUpdatePayload(data);
+      if (import.meta.env.DEV) {
+        console.log('[updateContact] outgoing payload:', supabasePayload);
+      }
       const { error } = await supabase
         .from('contacts')
         .update({ ...supabasePayload, user_id: userId })

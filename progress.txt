@@ -555,3 +555,21 @@
   - Gotchas
     - None.
 ---
+## 2026-02-03 05:05 - ADHOC-RADAR-INTERESTS
+- What was implemented
+  - Added explicit interests input parsing in the contact add/edit form and ensured radar_interests is saved from form state.
+  - Normalized radar_interests on contact creation and added dev-only logging for add/update payloads to trace Supabase persistence.
+- Files changed
+  - App.tsx
+  - services/dataService.ts
+- Assumptions made (if any)
+  - Since no existing interests input was found in the add/edit contact UI, added a dedicated field to capture them directly.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None.
+---
