@@ -536,10 +536,10 @@ const CommuteMode: React.FC = () => {
                         {saveError}
                     </div>
                 )}
-                <button 
-                    disabled={!transcript || isProcessing}
+                <button
+                    disabled={!(transcript.trim() || conversationTranscript.trim()) || isProcessing}
                     onClick={handleProcess}
-                    className={`w-full py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-xl transition-all shadow-2xl ${transcript && !isProcessing ? 'bg-primary text-white active:scale-95' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
+                    className={`w-full py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-xl transition-all shadow-2xl ${(transcript.trim() || conversationTranscript.trim()) && !isProcessing ? 'bg-primary text-white active:scale-95' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
                 >
                     {isProcessing ? "Processing Voice Memo..." : `Save to ${UI_LABELS.radar}`}
                 </button>
