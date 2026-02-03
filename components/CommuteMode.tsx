@@ -223,7 +223,7 @@ const CommuteMode: React.FC = () => {
             if (!supabase) {
                 if (active) {
                     setIsVoiceEnabled(false);
-                    setVoiceAuthMessage('Sign in to enable voice playback.');
+                    // Don't show intrusive message - voice is just quietly disabled
                 }
                 return;
             }
@@ -233,7 +233,8 @@ const CommuteMode: React.FC = () => {
             }
             if (sessionError || !sessionData?.session) {
                 setIsVoiceEnabled(false);
-                setVoiceAuthMessage(`${AUTH_REQUIRED_MESSAGE} Sign in to enable voice playback.`);
+                // Voice is disabled but we don't show a blocking message
+                // The user can still use all other features
                 return;
             }
             setVoiceAuthMessage('');
@@ -272,18 +273,15 @@ const CommuteMode: React.FC = () => {
                 const supabase = getSupabaseClient();
                 if (!supabase) {
                     setIsVoiceEnabled(false);
-                    setVoiceAuthMessage('Sign in to enable voice playback.');
                     setAudioUrl(null);
                     return;
                 }
                 const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
                 if (sessionError || !sessionData?.session) {
                     setIsVoiceEnabled(false);
-                    setVoiceAuthMessage(`${AUTH_REQUIRED_MESSAGE} Sign in to enable voice playback.`);
                     setAudioUrl(null);
                     return;
                 }
-                setVoiceAuthMessage('');
                 const { audio, mimeType } = await generateSpeechAudio(followUpResponse, selectedVoice);
                 if (cancelled) return;
                 const binary = atob(audio);
@@ -293,8 +291,14 @@ const CommuteMode: React.FC = () => {
                 setAudioUrl(url);
             } catch (error) {
                 if (cancelled) return;
-                console.error('Failed to generate speech audio', error);
-                setTtsError('Voice playback unavailable. Showing text only.');
+                console.warn('TTS unavailable:', error instanceof Error ? error.message : error);
+                // Don't show error for auth issues - voice is just disabled
+                // Only show error for unexpected failures
+                const isAuthError = error instanceof Error &&
+                    (error.message.includes('sign in') || error.message.includes('Unauthorized') || error.message.includes('401'));
+                if (!isAuthError) {
+                    setTtsError('Voice playback unavailable.');
+                }
                 setAudioUrl(null);
             } finally {
                 if (!cancelled) {

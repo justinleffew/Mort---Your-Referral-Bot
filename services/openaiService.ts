@@ -172,6 +172,74 @@ export const generateRadarMessage = async (
     }
 };
 
+/**
+ * Extract basic client information from transcript without AI.
+ * This is a fallback when the AI service is unavailable.
+ */
+const extractBrainDumpLocally = (transcript: string): BrainDumpClient[] => {
+    const trimmed = transcript.trim();
+    if (!trimmed) return [];
+
+    // Try to extract names - look for patterns like "name is X", "named X", "called X", or capitalized words
+    const namePatterns = [
+        /(?:name(?:'s| is)?|named|called|know|met)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+        /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:bought|sold|purchased|moved|lives?)/gi,
+    ];
+
+    const foundNames: string[] = [];
+    for (const pattern of namePatterns) {
+        let match;
+        while ((match = pattern.exec(trimmed)) !== null) {
+            const name = match[1]?.trim();
+            if (name && !['The', 'They', 'Their', 'This', 'That', 'When', 'Where', 'What', 'How'].includes(name)) {
+                foundNames.push(name);
+            }
+        }
+    }
+
+    // Try to extract location
+    const locationMatch = trimmed.match(/(?:in|at|near|from|lives? (?:in|at|near))\s+([A-Z][a-zA-Z\s,]+?)(?:\.|,|$)/i);
+    const location = locationMatch?.[1]?.trim() || '';
+
+    // Try to extract year
+    const yearMatch = trimmed.match(/\b(19|20)\d{2}\b/);
+    const year = yearMatch?.[0] || '';
+
+    // Try to extract interests
+    const interestPatterns = [
+        /(?:loves?|likes?|enjoys?|into|interested in|fan of|follows?)\s+([^.,]+)/gi,
+        /(?:plays?|watches?)\s+([^.,]+)/gi,
+    ];
+    const interests: string[] = [];
+    for (const pattern of interestPatterns) {
+        let match;
+        while ((match = pattern.exec(trimmed)) !== null) {
+            const interest = match[1]?.trim().toLowerCase();
+            if (interest && interest.length < 50) {
+                interests.push(interest);
+            }
+        }
+    }
+
+    // If we couldn't extract a name, use a placeholder with part of the transcript
+    const names = foundNames.length > 0
+        ? [foundNames[0]]
+        : [`Contact from ${new Date().toLocaleDateString()}`];
+
+    return [{
+        names,
+        location_context: location,
+        transaction_history: {
+            approx_year: year,
+            notes: trimmed.slice(0, 500), // Store the transcript as notes
+        },
+        radar_interests: [...new Set(interests)].slice(0, 5),
+        family_details: { children: [], pets: [] },
+        mortgage_inference: undefined,
+        tags: ['Voice Memo'],
+    }];
+};
+
 export const processBrainDump = async (transcript: string): Promise<BrainDumpClient[]> => {
     if (!transcript.trim()) return [];
 
@@ -202,12 +270,9 @@ export const processBrainDump = async (transcript: string): Promise<BrainDumpCli
         const data = await callOpenAiJson<{ clients?: BrainDumpClient[] }>(prompt);
         return data.clients || [];
     } catch (e) {
-        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
-            console.warn(e.message);
-            return [];
-        }
-        console.error("Failed to parse brain dump", e);
-        return [];
+        // If AI fails for any reason, fall back to local extraction
+        console.warn("AI processing failed, using local extraction:", e instanceof Error ? e.message : e);
+        return extractBrainDumpLocally(transcript);
     }
 };
 
@@ -314,10 +379,9 @@ export const generateBrainDumpFollowUps = async (transcript: string): Promise<{ 
             questions
         };
     } catch (e) {
-        if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
-            return { response: e.message, questions: [] };
-        }
-        console.error("Failed to generate brain dump follow-ups", e);
+        // For any error (including auth errors), use the local fallback
+        // This ensures the UI remains functional even without AI
+        console.warn("AI follow-ups unavailable, using local fallback:", e instanceof Error ? e.message : e);
         return buildBrainDumpFollowUpFallback(transcript);
     }
 };
