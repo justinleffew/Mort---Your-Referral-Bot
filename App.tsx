@@ -100,7 +100,15 @@ const PLAYBOOKS = [
   },
 ];
 
-const PlaybookPanel: React.FC = () => {
+type PlaybookPanelProps = {
+  className?: string;
+  buttonClassName?: string;
+};
+
+const PlaybookPanel: React.FC<PlaybookPanelProps> = ({
+  className = 'flex',
+  buttonClassName = '',
+}) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPlaybooks, setShowPlaybooks] = useState(false);
@@ -118,11 +126,11 @@ const PlaybookPanel: React.FC = () => {
 
   return (
     <>
-      <div className="flex justify-start px-2">
+      <div className={className}>
         <button
           type="button"
           onClick={() => setShowPlaybooks(true)}
-          className="text-xs font-black uppercase tracking-[0.2em] text-primary border border-primary/40 px-6 py-3 rounded-full hover:bg-secondary transition-colors"
+          className={`text-xs font-black uppercase tracking-[0.2em] text-primary border border-primary/40 px-6 py-3 rounded-full hover:bg-secondary transition-colors whitespace-nowrap ${buttonClassName}`}
         >
           Copy Ready Scripts
         </button>
@@ -176,9 +184,7 @@ const Dashboard: React.FC = () => {
   const [dueThisWeekCount, setDueThisWeekCount] = useState(0);
   const [cadenceDays, setCadenceDays] = useState(DEFAULT_CADENCE_DAYS);
   const [cadenceLabel, setCadenceLabel] = useState(getCadenceLabel(DEFAULT_PROFILE));
-  const [showAddMenu, setShowAddMenu] = useState(false);
   const [runNowOpportunities, setRunNowOpportunities] = useState<Opportunity[]>([]);
-  const [runNowLoading, setRunNowLoading] = useState(false);
   const [runNowError, setRunNowError] = useState<string | null>(null);
   const [selectedMessages, setSelectedMessages] = useState<Record<string, string>>({});
   const navigate = useNavigate();
@@ -238,6 +244,21 @@ const Dashboard: React.FC = () => {
       return dueDate <= endOfWeek;
     }).length;
     setDueThisWeekCount(dueThisWeek);
+    try {
+      const opportunities = await dataService.runNowOpportunities();
+      setRunNowOpportunities(opportunities);
+      const defaults: Record<string, string> = {};
+      opportunities.forEach(opportunity => {
+        if (opportunity.suggested_messages?.length) {
+          defaults[opportunity.id] = opportunity.suggested_messages[0];
+        }
+      });
+      setSelectedMessages(defaults);
+      setRunNowError(null);
+    } catch (error) {
+      console.warn('Run Now failed', error);
+      setRunNowError('Run Now failed. Please retry.');
+    }
   };
 
   const handleReachedOut = async (contactId: string) => {
@@ -258,30 +279,6 @@ const Dashboard: React.FC = () => {
       suppressed_until: suppressUntil.toISOString().split('T')[0]
     });
     await refreshRadar();
-  };
-
-  const handleRunNow = async () => {
-    setRunNowLoading(true);
-    setRunNowError(null);
-    try {
-      const opportunities = await dataService.runNowOpportunities();
-      setRunNowOpportunities(opportunities);
-      const defaults: Record<string, string> = {};
-      opportunities.forEach(opportunity => {
-        if (opportunity.suggested_messages?.length) {
-          defaults[opportunity.id] = opportunity.suggested_messages[0];
-        }
-      });
-      setSelectedMessages(defaults);
-      if (opportunities.length === 0) {
-        setRunNowError('No opportunities yet. Add more contacts.');
-      }
-    } catch (error) {
-      console.warn('Run Now failed', error);
-      setRunNowError('Run Now failed. Please retry.');
-    } finally {
-      setRunNowLoading(false);
-    }
   };
 
   const handleCopyMessage = async (message: string) => {
@@ -315,73 +312,13 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-2 pb-24">
-      {/* Selection Modal */}
-      {showAddMenu && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddMenu(false)}></div>
-          <div className="relative bg-surface border border-border w-full max-w-sm rounded-[2.5rem] p-8 space-y-4 shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Add Contact</h3>
-              <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest mt-1">Choose your entry mode</p>
-            </div>
-            <button 
-              onClick={() => { navigate('/commute'); setShowAddMenu(false); }} 
-              className="w-full bg-primary p-6 rounded-3xl flex items-center gap-4 group hover:scale-[1.02] transition-transform shadow-xl text-white"
-            >
-               <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-white">
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
-               </div>
-               <div className="text-left">
-                  <p className="text-white font-black uppercase text-xs tracking-widest">{UI_LABELS.ingestion}</p>
-                  <p className="text-white/70 text-xs font-bold">Fast voice memo capture</p>
-               </div>
-            </button>
-            <button 
-              onClick={() => { navigate('/contacts/add'); setShowAddMenu(false); }} 
-              className="w-full bg-muted border border-border p-6 rounded-3xl flex items-center gap-4 group hover:bg-secondary/60 transition-colors shadow-lg"
-            >
-               <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center text-foreground">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-               </div>
-               <div className="text-left">
-                  <p className="text-foreground font-black uppercase text-xs tracking-widest">Manual Entry</p>
-                  <p className="text-muted-foreground text-xs font-bold">Text & details</p>
-               </div>
-            </button>
-            <button onClick={() => setShowAddMenu(false)} className="w-full text-muted-foreground font-black uppercase text-xs tracking-[0.2em] pt-4">Cancel</button>
-          </div>
-        </div>
-      )}
-
-      <div className="flex justify-end mb-4">
-          <button
-            onClick={() => setShowAddMenu(true)}
-            className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:scale-95 transition-transform"
-          >
-            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          </button>
-      </div>
-
-      <div className="mb-6">
-        <PlaybookPanel />
-      </div>
-
-      <div className="flex justify-between items-center mb-6 px-2">
+    <div className="max-w-2xl mx-auto px-4 pt-0 pb-24">
+      <div className="flex justify-between items-center mb-4 px-2">
           <div>
             <h1 className="text-2xl font-black text-foreground uppercase tracking-tighter">This week&apos;s opportunities</h1>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{UI_LABELS.cadence}: {cadenceLabel}</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Follow-up plan: {cadenceLabel}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleRunNow}
-              disabled={runNowLoading}
-              className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border border-primary/40 text-primary hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {runNowLoading ? 'Running…' : 'Run Now'}
-            </button>
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{dueThisWeekCount} Due</span>
-          </div>
+          <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{dueThisWeekCount} Due</span>
       </div>
 
       {runNowError && (
@@ -514,8 +451,8 @@ const Dashboard: React.FC = () => {
             </li>
           </ol>
           <div className="flex flex-col items-center gap-3">
-            <button 
-              onClick={() => setShowAddMenu(true)} 
+            <button
+              onClick={() => navigate('/contacts/add')}
               className="bg-primary text-white font-black uppercase tracking-[0.2em] py-4 px-12 rounded-full transition-all shadow-xl active:scale-95"
             >
               Add Contact
@@ -1986,13 +1923,66 @@ const BottomNav: React.FC = () => {
 };
 
 const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const [showAddMenu, setShowAddMenu] = useState(false);
+    const isDashboard = location.pathname === '/';
+
     return (
         <div className="min-h-screen bg-app text-foreground">
-            <header className="px-6 py-4 flex items-center max-w-2xl mx-auto">
+            <header className="px-6 py-3 flex items-center justify-between max-w-2xl mx-auto">
                 <Link to="/" className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white font-black text-xl shadow-2xl">M</div>
                 </Link>
+                {isDashboard && (
+                    <div className="flex items-center gap-3 flex-wrap justify-end">
+                        <PlaybookPanel className="flex items-center" />
+                        <button
+                            onClick={() => setShowAddMenu(true)}
+                            className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:scale-95 transition-transform"
+                            aria-label="Add contact"
+                        >
+                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                        </button>
+                    </div>
+                )}
             </header>
+            {showAddMenu && (
+                <div className="fixed inset-0 z-[110] flex items-end justify-center px-4 pb-12 sm:items-center sm:pb-0">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddMenu(false)}></div>
+                    <div className="relative bg-surface border border-border w-full max-w-sm rounded-[2.5rem] p-8 space-y-4 shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
+                        <div className="text-center mb-6">
+                            <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Add Contact</h3>
+                            <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest mt-1">Choose your entry mode</p>
+                        </div>
+                        <button
+                            onClick={() => { navigate('/commute'); setShowAddMenu(false); }}
+                            className="w-full bg-primary p-6 rounded-3xl flex items-center gap-4 group hover:scale-[1.02] transition-transform shadow-xl text-white"
+                        >
+                            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-white">
+                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                            </div>
+                            <div className="text-left">
+                                <p className="text-white font-black uppercase text-xs tracking-widest">{UI_LABELS.ingestion}</p>
+                                <p className="text-white/70 text-xs font-bold">Fast voice memo capture</p>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => { navigate('/contacts/add'); setShowAddMenu(false); }}
+                            className="w-full bg-muted border border-border p-6 rounded-3xl flex items-center gap-4 group hover:bg-secondary/60 transition-colors shadow-lg"
+                        >
+                            <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center text-foreground">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </div>
+                            <div className="text-left">
+                                <p className="text-foreground font-black uppercase text-xs tracking-widest">Manual Entry</p>
+                                <p className="text-muted-foreground text-xs font-bold">Text & details</p>
+                            </div>
+                        </button>
+                        <button onClick={() => setShowAddMenu(false)} className="w-full text-muted-foreground font-black uppercase text-xs tracking-[0.2em] pt-4">Cancel</button>
+                    </div>
+                </div>
+            )}
             <main className="relative z-0">
                 <div className="fixed top-0 left-1/4 w-96 h-96 bg-secondary/40 rounded-full blur-[120px] pointer-events-none -z-10"></div>
                 <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-secondary/20 rounded-full blur-[120px] pointer-events-none -z-10"></div>
