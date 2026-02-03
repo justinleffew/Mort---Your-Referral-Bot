@@ -573,3 +573,25 @@
   - Gotchas
     - None.
 ---
+## 2026-02-03 15:18 - ADHOC-MORT-OPENAI-401
+- What was implemented
+  - Relaxed mort-openai auth to validate bearer tokens when present, allow unauthenticated calls, and return AUTH_REQUIRED with a clear sign-in message on token failures.
+  - Mapped edge function 401 errors to a consistent "Please sign in again." message and surfaced concrete error text instead of generic AI-unavailable placeholders.
+  - Documented mort-openai redeploy note for verify_jwt config changes.
+- Files changed
+  - supabase/functions/mort-openai/index.ts
+  - services/edgeFunctions.ts
+  - services/openaiService.ts
+  - services/dataService.ts
+  - DEPLOY.md
+- Assumptions made (if any)
+  - Supabase function invoke errors expose status codes or "unauthorized" text; if not, the AUTH_REQUIRED mapping falls back to the error message.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+- Learnings for future iterations:
+  - Patterns discovered
+    - None.
+  - Gotchas
+    - None.
+---
