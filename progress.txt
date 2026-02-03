@@ -504,3 +504,35 @@
     - None.
     - Playwright screenshot capture failed due to a Chromium crash in the container.
 ---
+## 2026-02-03 04:20 - ADHOC-PREFS-SCHEMA
+- What was implemented
+  - Added a dev-only Supabase URL boot log, removed the AI Engine label from Preferences, and wired preference saves to the new cadence columns with schema-cache retry handling and clearer errors.
+  - Updated Realtor profile load/save flows to read/write cadence + cadence_custom_days, keeping UI state aligned with the new schema.
+- Files changed
+  - App.tsx
+  - services/dataService.ts
+  - services/supabaseClient.ts
+  - types.ts
+- Assumptions made (if any)
+  - Treated this request as an ad-hoc fix outside the PRD stories, so prd.json was not updated.
+  - Assumed preserving existing headshot saves was desired, so the preferences save helper accepts an optional headshot payload.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass; npm warned about "http-proxy" env config)
+  - npm run build (pass; npm warned about "http-proxy" env config)
+  - Skipped lint/tests (no scripts in package.json).
+- Learnings for future iterations:
+  - Patterns discovered
+    - Prefs save errors should surface Supabase schema-cache mismatches and retry after brief delay.
+  - Gotchas
+    - None observed.
+---
+## 2026-02-03 04:21 - ADHOC-PREFS-SCHEMA-ADDENDUM
+- Correction
+  - services/supabaseClient.ts was not modified in this iteration; the Supabase URL log was added in App.tsx using the existing helper.
+---
+## 2026-02-03 04:22 - ADHOC-PREFS-SCHEMA-UNCERTAINTIES
+- Uncertainties and resolutions
+  - Unsure whether cadence_type or cadence should be authoritative, resolved by scanning dataService/App usage and updating to prioritize cadence while tolerating cadence_type fallbacks.
+  - Unsure how prefs save should handle headshot fields, resolved by keeping optional headshot writes in the preferences upsert.
+  - Unsure where to implement schema-cache retry, resolved by adding a single retry in the Preferences save handler to keep UI messaging clear.
+---

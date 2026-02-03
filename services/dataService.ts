@@ -81,7 +81,7 @@ const uuid = () => crypto.randomUUID();
 const DEFAULT_PROFILE_NAME = 'Agent';
 const DEFAULT_CADENCE_DAYS = 90;
 const DEFAULT_PROFILE_CADENCE = {
-  cadence_type: 'quarterly' as const,
+  cadence: 'quarterly' as const,
   cadence_custom_days: DEFAULT_CADENCE_DAYS,
 };
 const PROFILE_SYNC_COOLDOWN_MS = 30_000;
@@ -135,7 +135,7 @@ const formatSupabaseError = (
 };
 
 const resolveCadenceDays = (profile?: RealtorProfile) => {
-  const cadenceType = profile?.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type;
+  const cadenceType = profile?.cadence ?? profile?.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence;
   if (cadenceType === 'weekly') return 7;
   if (cadenceType === 'monthly') return 30;
   if (cadenceType === 'custom') {
@@ -148,7 +148,7 @@ const resolveCadenceDays = (profile?: RealtorProfile) => {
 const withProfileDefaults = (profile?: RealtorProfile | null): RealtorProfile => ({
   name: profile?.name ?? DEFAULT_PROFILE_NAME,
   headshot: profile?.headshot ?? undefined,
-  cadence_type: profile?.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
+  cadence: profile?.cadence ?? profile?.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence,
   cadence_custom_days:
     profile?.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
 });
@@ -204,7 +204,7 @@ const selectProfileForUser = async (userId: string): Promise<RealtorProfile> => 
     const profile = withProfileDefaults({
       name: data.name,
       headshot: data.headshot ?? undefined,
-      cadence_type: data.cadence_type ?? undefined,
+      cadence: data.cadence ?? data.cadence_type ?? undefined,
       cadence_custom_days: data.cadence_custom_days ?? undefined,
     });
     cachedProfile = profile;
@@ -225,7 +225,7 @@ const ensureProfileForUser = async (userId: string): Promise<RealtorProfile | nu
     user_id: userId,
     name: defaults.name,
     headshot: defaults.headshot ?? null,
-    cadence_type: defaults.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
+    cadence: defaults.cadence ?? DEFAULT_PROFILE_CADENCE.cadence,
     cadence_custom_days: defaults.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
   };
   const { data, error } = await supabase
@@ -241,7 +241,7 @@ const ensureProfileForUser = async (userId: string): Promise<RealtorProfile | nu
   const profile = withProfileDefaults({
     name: data?.name ?? defaults.name,
     headshot: data?.headshot ?? defaults.headshot,
-    cadence_type: data?.cadence_type ?? defaults.cadence_type,
+    cadence: data?.cadence ?? data?.cadence_type ?? defaults.cadence,
     cadence_custom_days: data?.cadence_custom_days ?? defaults.cadence_custom_days,
   });
   cachedProfile = profile;
@@ -257,6 +257,78 @@ const getSupabaseUserId = async (supabase: ReturnType<typeof getSupabaseClient>)
     return null;
   }
   return data.user?.id ?? null;
+};
+
+type RealtorPreferencesInput = {
+  name: string;
+  cadence: 'weekly' | 'monthly' | 'quarterly' | 'custom';
+  cadenceCustomDays?: number | null;
+  headshot?: string | null;
+};
+
+const saveRealtorPreferences = async (input: RealtorPreferencesInput): Promise<RealtorProfile> => {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    if (isProfileSyncDisabled()) {
+      throw new Error('Profile sync is temporarily unavailable. Please retry.');
+    }
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.warn('Failed to load auth session for profile save', sessionError);
+      throw new Error('Unable to check authentication status.');
+    }
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) {
+      throw new Error('AUTH_REQUIRED');
+    }
+    const payload: {
+      user_id: string;
+      name: string | null;
+      cadence: RealtorPreferencesInput['cadence'];
+      cadence_custom_days: number | null;
+      updated_at: string;
+      headshot?: string | null;
+    } = {
+      user_id: userId,
+      name: input.name?.trim() || null,
+      cadence: input.cadence,
+      cadence_custom_days: input.cadence === 'custom' ? (input.cadenceCustomDays ?? null) : null,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.headshot !== undefined) {
+      payload.headshot = input.headshot;
+    }
+    const { data, error } = await supabase
+      .from('realtor_profiles')
+      .upsert(payload, { onConflict: 'user_id' })
+      .select()
+      .single();
+    if (error) {
+      disableProfileSync(error);
+      throw error;
+    }
+    const savedProfile = withProfileDefaults({
+      name: data?.name ?? input.name,
+      headshot: data?.headshot ?? input.headshot ?? undefined,
+      cadence: data?.cadence ?? data?.cadence_type ?? input.cadence,
+      cadence_custom_days:
+        data?.cadence_custom_days ??
+        (input.cadence === 'custom' ? input.cadenceCustomDays ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days : null) ??
+        DEFAULT_PROFILE_CADENCE.cadence_custom_days,
+    });
+    cachedProfile = savedProfile;
+    cachedProfileUserId = userId;
+    return savedProfile;
+  }
+
+  const fallbackProfile = withProfileDefaults({
+    name: input.name,
+    headshot: input.headshot ?? undefined,
+    cadence: input.cadence,
+    cadence_custom_days: input.cadence === 'custom' ? input.cadenceCustomDays ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days : null,
+  });
+  save(STORAGE_KEYS.PROFILE, fallbackProfile);
+  return fallbackProfile;
 };
 
 const requireSupabaseUserId = async (
@@ -440,64 +512,16 @@ export const dataService = {
     return withProfileDefaults(loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE));
   },
 
-  saveProfile: async (profile: RealtorProfile): Promise<RealtorProfile> => {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      if (isProfileSyncDisabled()) {
-        throw new Error('Profile sync is temporarily unavailable. Please retry.');
-      }
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.warn('Failed to load auth session for profile save', sessionError);
-        throw new Error('Unable to check authentication status.');
-      }
-      const userId = sessionData?.session?.user?.id;
-      if (!userId) {
-        throw new Error('Sign in required to save preferences.');
-      }
-      const payload = {
-        user_id: userId,
-        name: profile.name,
-        headshot: profile.headshot ?? null,
-        cadence_type: profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
-        cadence_custom_days: profile.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
-        updated_at: new Date().toISOString(),
-      };
-      const { data, error } = await supabase
-        .from('realtor_profiles')
-        .upsert(payload, { onConflict: 'user_id' })
-        .select()
-        .single();
-      if (error) {
-        const status = (error as { status?: number }).status;
-        console.warn('Failed to save profile', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-          status,
-        });
-        disableProfileSync(error);
-        throw new Error(formatSupabaseError('save profile', error));
-      }
-      const savedProfile = withProfileDefaults({
-        name: data?.name ?? profile.name,
-        headshot: data?.headshot ?? profile.headshot ?? undefined,
-        cadence_type: data?.cadence_type ?? profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
-        cadence_custom_days:
-          data?.cadence_custom_days ??
-          profile.cadence_custom_days ??
-          DEFAULT_PROFILE_CADENCE.cadence_custom_days,
-      });
-      cachedProfile = savedProfile;
-      cachedProfileUserId = userId;
-      return savedProfile;
-    }
+  saveRealtorPreferences: async (input: RealtorPreferencesInput): Promise<RealtorProfile> =>
+    saveRealtorPreferences(input),
 
-    // LocalStorage fallback (when Supabase is not configured).
-    save(STORAGE_KEYS.PROFILE, profile);
-    return withProfileDefaults(profile);
-  },
+  saveProfile: async (profile: RealtorProfile): Promise<RealtorProfile> =>
+    saveRealtorPreferences({
+      name: profile.name,
+      cadence: profile.cadence ?? profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence,
+      cadenceCustomDays: profile.cadence_custom_days ?? null,
+      headshot: profile.headshot ?? null,
+    }),
 
   getContacts: async (): Promise<Contact[]> => {
     const supabase = getSupabaseClient();

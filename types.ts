@@ -87,6 +87,7 @@ export interface GeneralAssistResponse {
 export interface RealtorProfile {
   name: string;
   headshot?: string; // base64
+  cadence?: 'weekly' | 'monthly' | 'quarterly' | 'custom';
   cadence_type?: 'weekly' | 'monthly' | 'quarterly' | 'custom';
   cadence_custom_days?: number;
 }
