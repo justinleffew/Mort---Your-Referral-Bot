@@ -1,4 +1,4 @@
-import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient, GeneralAssistResponse } from "../types";
+import { Contact, ContactNote, RadarAngle, GeneratedMessage, MortgageQueryResponse, BrainDumpClient, GeneralAssistResponse, MortgageInference } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctions";
 import { EDGE_FUNCTIONS } from "./edgeFunctionConfig";
@@ -10,7 +10,10 @@ type EdgeFunctionResponse<T> = {
 
 export const AUTH_REQUIRED_MESSAGE = 'Please sign in to use Mort AI.';
 
-const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
+const callOpenAiJson = async <T>(
+    prompt: string,
+    options?: { temperature?: number }
+): Promise<T> => {
     const supabase = getSupabaseClient();
     if (!supabase) {
         throw new Error('Supabase is not configured.');
@@ -24,9 +27,9 @@ const callOpenAiJson = async <T>(prompt: string): Promise<T> => {
         throw new Error(AUTH_REQUIRED_MESSAGE);
     }
 
-    const payload = await invokeEdgeFunction<EdgeFunctionResponse<T>, { prompt: string }>({
+    const payload = await invokeEdgeFunction<EdgeFunctionResponse<T>, { prompt: string; temperature?: number }>({
         functionName: EDGE_FUNCTIONS.OPENAI,
-        body: { prompt },
+        body: { prompt, temperature: options?.temperature },
     });
     if (!payload?.data) {
         throw new Error('Invalid AI response.');
@@ -244,39 +247,178 @@ const extractBrainDumpLocally = (transcript: string): BrainDumpClient[] => {
 export const processBrainDump = async (transcript: string): Promise<BrainDumpClient[]> => {
     if (!transcript.trim()) return [];
 
+    const trimmedTranscript = transcript.trim();
+
+    type BrainDumpContactJson = {
+        first_name?: string;
+        last_name?: string;
+        notes?: string;
+        tags?: string[];
+        follow_up_plan?: string;
+        location_context?: string;
+        approx_year?: string;
+        radar_interests?: string[];
+        family_details?: {
+            children?: string[];
+            pets?: string[];
+        };
+        mortgage_inference?: MortgageInference | null;
+        suggested_action?: string;
+        names?: string[];
+        transaction_history?: {
+            approx_year?: string;
+            notes?: string;
+        };
+    };
+
+    const sanitizeName = (value: string) =>
+        value.replace(/\b(and|&)\b\s*$/i, '').replace(/\s+/g, ' ').trim();
+
+    const normalizeBrainDumpContacts = (data: { contacts?: BrainDumpContactJson[]; clients?: BrainDumpContactJson[] }) => {
+        const rawContacts = Array.isArray(data.contacts)
+            ? data.contacts
+            : Array.isArray(data.clients)
+              ? data.clients
+              : [];
+
+        const normalized = rawContacts
+            .map(contact => {
+                const namesFromArray = Array.isArray(contact.names)
+                    ? contact.names.map(name => sanitizeName(String(name))).filter(Boolean)
+                    : [];
+                const firstName = sanitizeName(contact.first_name ?? '');
+                const lastName = sanitizeName(contact.last_name ?? '');
+                const combinedName = [firstName, lastName].filter(Boolean).join(' ').trim();
+                const finalNames = namesFromArray.length > 0 ? namesFromArray : combinedName ? [combinedName] : [];
+                if (finalNames.length === 0) {
+                    return null;
+                }
+                return {
+                    names: finalNames,
+                    location_context: contact.location_context?.trim() ?? '',
+                    transaction_history: {
+                        approx_year:
+                            contact.approx_year?.trim() ??
+                            contact.transaction_history?.approx_year?.trim() ??
+                            '',
+                        notes:
+                            contact.notes?.trim() ??
+                            contact.transaction_history?.notes?.trim() ??
+                            '',
+                    },
+                    radar_interests: Array.isArray(contact.radar_interests)
+                        ? contact.radar_interests.filter(Boolean)
+                        : [],
+                    family_details: {
+                        children: contact.family_details?.children ?? [],
+                        pets: contact.family_details?.pets ?? [],
+                    },
+                    mortgage_inference: contact.mortgage_inference ?? undefined,
+                    suggested_action: contact.suggested_action?.trim() ?? '',
+                    tags: Array.isArray(contact.tags) ? contact.tags.filter(Boolean) : [],
+                } satisfies BrainDumpClient;
+            })
+            .filter((value): value is BrainDumpClient => Boolean(value));
+
+        if (normalized.length === 0) {
+            throw new Error('No valid contacts found in AI response.');
+        }
+
+        return normalized;
+    };
+
     const prompt = `
-    You are "Mort," a backend data processing agent for a CRM app designed for Real Estate Agents.
-    Ingest the following unstructured voice transcript about past clients and extract structured data.
+You are "Mort," a backend data processing agent for a CRM app designed for Real Estate Agents.
+Use ONLY the transcript provided below. Do NOT use any prior context or memory.
 
-    Input Transcript: "${transcript}"
+Return STRICT JSON only. Do not wrap in code fences or add commentary.
+Schema:
+{
+  "contacts": [
+    {
+      "first_name": "Jake",
+      "last_name": "",
+      "notes": "",
+      "tags": [],
+      "follow_up_plan": "",
+      "location_context": "",
+      "approx_year": "",
+      "radar_interests": [],
+      "family_details": { "children": [], "pets": [] },
+      "mortgage_inference": null,
+      "suggested_action": ""
+    }
+  ]
+}
 
-    RULES:
-    1. Identify Distinct Clients. Separate them.
-    2. Extract names, locations, and approx year of transaction.
-    3. Extract hobbies, sports teams, kids, pets.
-    4. Infer Mortgage Opportunities:
-       - 2020-2021: Assume Low Rate (<3.5%), High Equity. Tag: "HELOC / Cash-Out".
-       - 2023-2024: Assume High Rate (>6.5%). Tag: "Refinance Watch".
-       - 5+ Years Ago: Assume Move-up Buyer or Empty Nester.
-    5. Assign matching tags from the lists below. Only use tags that apply, otherwise return an empty array.
+RULES:
+1. Identify distinct clients and separate them.
+2. Extract names, locations, and approx year of transaction.
+3. Extract hobbies, sports teams, kids, pets.
+4. Infer Mortgage Opportunities:
+   - 2020-2021: Assume Low Rate (<3.5%), High Equity. Tag: "HELOC / Cash-Out".
+   - 2023-2024: Assume High Rate (>6.5%). Tag: "Refinance Watch".
+   - 5+ Years Ago: Assume Move-up Buyer or Empty Nester.
+5. Assign matching tags from the lists below. Only use tags that apply, otherwise return an empty array.
 
-    PRIMARY TAGS: Past Client, Friend, Family, Good Referral Source, Investor, Other
-    SECONDARY TAGS: Professional Partner, Neighbor, Sphere of Influence, Community Worker, Local Business Owner, High Trust, Low Trust, Bad Experience, Influencer/Connector, Luxury/HNW, Fitness/Health Focused, Sports Connection, Faith-Oriented, Prefers Texting, Loves to talk, Detail-oriented, Decisive, Needs Reassurance, High Energy
+PRIMARY TAGS: Past Client, Friend, Family, Good Referral Source, Investor, Other
+SECONDARY TAGS: Professional Partner, Neighbor, Sphere of Influence, Community Worker, Local Business Owner, High Trust, Low Trust, Bad Experience, Influencer/Connector, Luxury/HNW, Fitness/Health Focused, Sports Connection, Faith-Oriented, Prefers Texting, Loves to talk, Detail-oriented, Decisive, Needs Reassurance, High Energy
 
-    Each client object must include a tags array.
-    Output ONLY a JSON object: { "clients": [ ... ] }
-    `;
+Transcript:
+"""${trimmedTranscript}"""
+`;
+
+    const fixPrompt = `
+The previous response was invalid. Return ONLY valid JSON that matches this schema:
+{
+  "contacts": [
+    {
+      "first_name": "Jake",
+      "last_name": "",
+      "notes": "",
+      "tags": [],
+      "follow_up_plan": "",
+      "location_context": "",
+      "approx_year": "",
+      "radar_interests": [],
+      "family_details": { "children": [], "pets": [] },
+      "mortgage_inference": null,
+      "suggested_action": ""
+    }
+  ]
+}
+
+Use ONLY this transcript (no prior context):
+"""${trimmedTranscript}"""
+`;
 
     try {
-        const data = await callOpenAiJson<{ clients?: BrainDumpClient[] }>(prompt);
-        return data.clients || [];
+        const data = await callOpenAiJson<{ contacts?: BrainDumpContactJson[]; clients?: BrainDumpContactJson[] }>(
+            prompt,
+            { temperature: 0.1 }
+        );
+        return normalizeBrainDumpContacts(data);
     } catch (e) {
         if (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) {
             throw e;
         }
-        // If AI fails for any reason, fall back to local extraction
-        console.warn("AI processing failed, using local extraction:", e instanceof Error ? e.message : e);
-        return extractBrainDumpLocally(transcript);
+        try {
+            const data = await callOpenAiJson<{ contacts?: BrainDumpContactJson[]; clients?: BrainDumpContactJson[] }>(
+                fixPrompt,
+                { temperature: 0.1 }
+            );
+            return normalizeBrainDumpContacts(data);
+        } catch (retryError) {
+            if (retryError instanceof Error && retryError.message === AUTH_REQUIRED_MESSAGE) {
+                throw retryError;
+            }
+            // If AI fails for any reason, fall back to local extraction
+            console.warn(
+                "AI processing failed, using local extraction:",
+                retryError instanceof Error ? retryError.message : retryError
+            );
+            return extractBrainDumpLocally(trimmedTranscript);
+        }
     }
 };
 

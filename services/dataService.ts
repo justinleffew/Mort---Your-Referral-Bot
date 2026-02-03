@@ -440,37 +440,63 @@ export const dataService = {
     return withProfileDefaults(loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE));
   },
 
-  saveProfile: async (profile: RealtorProfile) => {
+  saveProfile: async (profile: RealtorProfile): Promise<RealtorProfile> => {
     const supabase = getSupabaseClient();
-    const userId = await getSupabaseUserId(supabase);
-    if (supabase && userId && !isProfileSyncDisabled()) {
-      // Supabase mode.
+    if (supabase) {
+      if (isProfileSyncDisabled()) {
+        throw new Error('Profile sync is temporarily unavailable. Please retry.');
+      }
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.warn('Failed to load auth session for profile save', sessionError);
+        throw new Error('Unable to check authentication status.');
+      }
+      const userId = sessionData?.session?.user?.id;
+      if (!userId) {
+        throw new Error('Sign in required to save preferences.');
+      }
       const payload = {
         user_id: userId,
         name: profile.name,
         headshot: profile.headshot ?? null,
         cadence_type: profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
         cadence_custom_days: profile.cadence_custom_days ?? DEFAULT_PROFILE_CADENCE.cadence_custom_days,
+        updated_at: new Date().toISOString(),
       };
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('realtor_profiles')
-        .upsert(payload, { onConflict: 'user_id' });
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single();
       if (error) {
-        console.warn('Failed to save profile', error);
+        const status = (error as { status?: number }).status;
+        console.warn('Failed to save profile', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          status,
+        });
         disableProfileSync(error);
         throw new Error(formatSupabaseError('save profile', error));
-      } else {
-        cachedProfile = withProfileDefaults({
-          ...profile,
-          headshot: profile.headshot ?? undefined,
-        });
-        cachedProfileUserId = userId;
       }
-      return;
+      const savedProfile = withProfileDefaults({
+        name: data?.name ?? profile.name,
+        headshot: data?.headshot ?? profile.headshot ?? undefined,
+        cadence_type: data?.cadence_type ?? profile.cadence_type ?? DEFAULT_PROFILE_CADENCE.cadence_type,
+        cadence_custom_days:
+          data?.cadence_custom_days ??
+          profile.cadence_custom_days ??
+          DEFAULT_PROFILE_CADENCE.cadence_custom_days,
+      });
+      cachedProfile = savedProfile;
+      cachedProfileUserId = userId;
+      return savedProfile;
     }
 
-    // LocalStorage fallback.
+    // LocalStorage fallback (when Supabase is not configured).
     save(STORAGE_KEYS.PROFILE, profile);
+    return withProfileDefaults(profile);
   },
 
   getContacts: async (): Promise<Contact[]> => {
@@ -601,10 +627,19 @@ export const dataService = {
   },
 
   addBrainDumpClients: async (clients: BrainDumpClient[]) => {
+    const sanitizeName = (value: string) =>
+      value.replace(/\b(and|&)\b\s*$/i, '').replace(/\s+/g, ' ').trim();
     for (const c of clients) {
       const parsedYear = parseApproxYear(c.transaction_history?.approx_year);
+      const cleanedNames = (c.names || [])
+        .map(name => sanitizeName(String(name)))
+        .filter(Boolean);
+      const finalNames =
+        cleanedNames.length > 0
+          ? cleanedNames
+          : [`Contact from ${new Date().toLocaleDateString()}`];
       const contact = await dataService.addContact({
-        full_name: c.names.join(' & '),
+        full_name: finalNames.join(' & '),
         location_context: c.location_context,
         sale_date: parsedYear ? `${parsedYear}-01-01` : undefined,
         radar_interests: c.radar_interests,
