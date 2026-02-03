@@ -76,10 +76,7 @@ export interface Touch {
 }
 
 export interface MortgageQueryResponse {
-  buyer_script: string;
-  ballpark_numbers: string;
-  heads_up: string;
-  next_steps: string;
+  response: string;
 }
 
 export interface GeneralAssistResponse {

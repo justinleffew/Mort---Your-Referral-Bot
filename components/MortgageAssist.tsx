@@ -33,12 +33,13 @@ const MortgageAssist: React.FC<MortgageAssistProps> = () => {
     const buttonLabel = 'Generate Response';
     const containerHeight = 'h-full';
 
-    const handleCopy = async (value: string, section: string) => {
-        if (!value) return;
-        await navigator.clipboard.writeText(value);
-        setCopiedSection(section);
+    const handleCopy = async () => {
+        if (!response?.response) return;
+        await navigator.clipboard.writeText(response.response);
+        setCopiedSection('response');
         setTimeout(() => setCopiedSection(null), 2000);
     };
+
     return (
         <div className={`bg-surface border border-border rounded-2xl overflow-hidden flex flex-col ${containerHeight} relative shadow-xl`}>
             <div className="p-4 border-b border-border bg-muted flex justify-between items-center">
@@ -65,75 +66,22 @@ const MortgageAssist: React.FC<MortgageAssistProps> = () => {
                 </form>
 
                 {response && (
-                    <div className="space-y-4 text-sm text-muted-foreground">
-                        <div className="bg-muted border border-border rounded-xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Buyer Script</div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleCopy(response.buyer_script, 'buyer_script')}
-                                    className="text-xs font-black uppercase tracking-widest text-primary inline-flex items-center gap-1"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h10v10H8z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 16H5a2 2 0 01-2-2V5a2 2 0 012-2h9a2 2 0 012 2v1" />
-                                    </svg>
-                                    {copiedSection === 'buyer_script' ? 'Copied' : 'Copy'}
-                                </button>
-                            </div>
-                            <p className="whitespace-pre-wrap text-lg text-foreground">{response.buyer_script}</p>
+                    <div className="bg-muted border border-border rounded-xl p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Response</div>
+                            <button
+                                type="button"
+                                onClick={handleCopy}
+                                className="text-xs font-black uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h10v10H8z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 16H5a2 2 0 01-2-2V5a2 2 0 012-2h9a2 2 0 012 2v1" />
+                                </svg>
+                                {copiedSection === 'response' ? 'Copied' : 'Copy'}
+                            </button>
                         </div>
-                        <div className="bg-muted border border-border rounded-xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Ballpark Numbers</div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleCopy(response.ballpark_numbers, 'ballpark_numbers')}
-                                    className="text-xs font-black uppercase tracking-widest text-primary inline-flex items-center gap-1"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h10v10H8z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 16H5a2 2 0 01-2-2V5a2 2 0 012-2h9a2 2 0 012 2v1" />
-                                    </svg>
-                                    {copiedSection === 'ballpark_numbers' ? 'Copied' : 'Copy'}
-                                </button>
-                            </div>
-                            <p className="whitespace-pre-wrap text-lg text-foreground">{response.ballpark_numbers}</p>
-                        </div>
-                        <div className="bg-muted border border-border rounded-xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Heads Up</div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleCopy(response.heads_up, 'heads_up')}
-                                    className="text-xs font-black uppercase tracking-widest text-primary inline-flex items-center gap-1"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h10v10H8z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 16H5a2 2 0 01-2-2V5a2 2 0 012-2h9a2 2 0 012 2v1" />
-                                    </svg>
-                                    {copiedSection === 'heads_up' ? 'Copied' : 'Copy'}
-                                </button>
-                            </div>
-                            <p className="whitespace-pre-wrap text-lg text-foreground">{response.heads_up}</p>
-                        </div>
-                        <div className="bg-muted border border-border rounded-xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Next Steps</div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleCopy(response.next_steps, 'next_steps')}
-                                    className="text-xs font-black uppercase tracking-widest text-primary inline-flex items-center gap-1"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h10v10H8z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 16H5a2 2 0 01-2-2V5a2 2 0 012-2h9a2 2 0 012 2v1" />
-                                    </svg>
-                                    {copiedSection === 'next_steps' ? 'Copied' : 'Copy'}
-                                </button>
-                            </div>
-                            <p className="whitespace-pre-wrap text-lg text-foreground">{response.next_steps}</p>
-                        </div>
+                        <p className="whitespace-pre-wrap text-base text-foreground leading-relaxed">{response.response}</p>
                     </div>
                 )}
             </div>

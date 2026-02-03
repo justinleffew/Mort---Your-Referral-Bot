@@ -83,6 +83,13 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
     setIsSubmitting(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && email && password && !isSubmitting) {
+      e.preventDefault();
+      handleSignIn();
+    }
+  };
+
   return (
     <section className="max-w-md mx-auto p-6 pb-0">
       <div className="bg-surface border border-border rounded-[2.5rem] p-8 shadow-2xl space-y-6">
@@ -98,6 +105,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              onKeyDown={handleKeyDown}
               className="mt-2 w-full bg-muted border border-border rounded-2xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="you@example.com"
             />
@@ -108,6 +116,7 @@ const AuthPanel: React.FC<AuthPanelProps> = ({ supabase }) => {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              onKeyDown={handleKeyDown}
               className="mt-2 w-full bg-muted border border-border rounded-2xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="••••••••"
             />
