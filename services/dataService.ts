@@ -27,6 +27,7 @@ const STORAGE_KEYS = {
 };
 
 const STORAGE_VERSION = 'v2';
+const AUTH_REQUIRED_MESSAGE = 'Please sign in to use Mort AI.';
 
 type VersionedPayload<T> = {
   version: string;
@@ -83,8 +84,9 @@ const DEFAULT_PROFILE_CADENCE = {
   cadence_type: 'quarterly' as const,
   cadence_custom_days: DEFAULT_CADENCE_DAYS,
 };
+const PROFILE_SYNC_COOLDOWN_MS = 30_000;
 let authProfileInitialized = false;
-let profileSyncDisabled = false;
+let profileSyncDisabledUntil: number | null = null;
 let cachedProfile: RealtorProfile | null = null;
 let cachedProfileUserId: string | null = null;
 let profileFetchPromise: Promise<RealtorProfile> | null = null;
@@ -93,25 +95,22 @@ let referralEventsDisabled = false;
 
 const shouldDisableProfileSync = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
   const status = error.status ?? Number(error.code);
-  if (status && [400, 401, 403].includes(status)) return true;
+  if (status === 404) return true;
   const message = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
   return (
-    message.includes('permission') ||
-    message.includes('jwt') ||
-    message.includes('row level security') ||
-    message.includes('realtor_profiles') ||
-    message.includes('schema cache') ||
-    message.includes('column') ||
-    message.includes('relation')
+    (message.includes('relation') && message.includes('does not exist')) ||
+    (message.includes('realtor_profiles') && message.includes('does not exist'))
   );
 };
 
 const disableProfileSync = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
-  if (!profileSyncDisabled && shouldDisableProfileSync(error)) {
-    profileSyncDisabled = true;
-    console.warn('Disabling Supabase profile sync due to repeated errors. Falling back to local storage.');
+  if (shouldDisableProfileSync(error)) {
+    profileSyncDisabledUntil = Date.now() + PROFILE_SYNC_COOLDOWN_MS;
+    console.warn('Temporarily disabling Supabase profile sync after errors. Falling back to local storage.');
   }
 };
+const isProfileSyncDisabled = () =>
+  profileSyncDisabledUntil !== null && Date.now() < profileSyncDisabledUntil;
 
 const shouldDisableReferralEvents = (error: { message?: string; code?: string; details?: string; hint?: string; status?: number }) => {
   const status = error.status ?? Number(error.code);
@@ -162,7 +161,7 @@ const resetProfileCache = () => {
 };
 
 const selectProfileForUser = async (userId: string): Promise<RealtorProfile> => {
-  if (profileSyncDisabled) {
+  if (isProfileSyncDisabled()) {
     return withProfileDefaults(loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE));
   }
   if (profileFetchErrorUserId === userId) {
@@ -216,7 +215,7 @@ const selectProfileForUser = async (userId: string): Promise<RealtorProfile> => 
 };
 
 const ensureProfileForUser = async (userId: string): Promise<RealtorProfile | null> => {
-  if (profileSyncDisabled) {
+  if (isProfileSyncDisabled()) {
     return withProfileDefaults(loadObject<RealtorProfile>(STORAGE_KEYS.PROFILE));
   }
   const supabase = getSupabaseClient();
@@ -422,6 +421,7 @@ export const dataService = {
       const nextUserId = session?.user?.id ?? null;
       if (nextUserId !== lastUserId) {
         resetProfileCache();
+        profileSyncDisabledUntil = null;
         lastUserId = nextUserId;
       }
       if (!nextUserId) return;
@@ -432,7 +432,7 @@ export const dataService = {
   getProfile: async (): Promise<RealtorProfile> => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
-    if (supabase && userId && !profileSyncDisabled) {
+    if (supabase && userId && !isProfileSyncDisabled()) {
       return selectProfileForUser(userId);
     }
 
@@ -443,7 +443,7 @@ export const dataService = {
   saveProfile: async (profile: RealtorProfile) => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
-    if (supabase && userId && !profileSyncDisabled) {
+    if (supabase && userId && !isProfileSyncDisabled()) {
       // Supabase mode.
       const payload = {
         user_id: userId,
@@ -520,6 +520,9 @@ export const dataService = {
   addContact: async (data: Partial<Contact>): Promise<Contact> => {
     const supabase = getSupabaseClient();
     const userId = await getSupabaseUserId(supabase);
+    if (supabase && !userId) {
+      throw new Error(AUTH_REQUIRED_MESSAGE);
+    }
     const demoMode = !userId;
     console.info('Add contact request', {
       userId: userId ?? 'none',
@@ -598,41 +601,21 @@ export const dataService = {
   },
 
   addBrainDumpClients: async (clients: BrainDumpClient[]) => {
-    let savedCount = 0;
-    let lastError: Error | null = null;
-
     for (const c of clients) {
-      try {
-        const parsedYear = parseApproxYear(c.transaction_history?.approx_year);
-        const contact = await dataService.addContact({
-          full_name: c.names.join(' & '),
-          location_context: c.location_context,
-          sale_date: parsedYear ? `${parsedYear}-01-01` : undefined,
-          radar_interests: c.radar_interests,
-          family_details: c.family_details,
-          mortgage_inference: c.mortgage_inference,
-          suggested_action: c.suggested_action,
-          tags: c.tags ?? [],
-        });
-        savedCount++;
-        if (c.transaction_history?.notes) {
-          try {
-            await dataService.addNote(contact.id, c.transaction_history.notes);
-          } catch (noteError) {
-            console.warn('Failed to add note for contact', contact.id, noteError);
-            // Continue even if note fails
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to save brain dump client', c.names, error);
-        lastError = error instanceof Error ? error : new Error(String(error));
-        // Continue trying to save other clients
+      const parsedYear = parseApproxYear(c.transaction_history?.approx_year);
+      const contact = await dataService.addContact({
+        full_name: c.names.join(' & '),
+        location_context: c.location_context,
+        sale_date: parsedYear ? `${parsedYear}-01-01` : undefined,
+        radar_interests: c.radar_interests,
+        family_details: c.family_details,
+        mortgage_inference: c.mortgage_inference,
+        suggested_action: c.suggested_action,
+        tags: c.tags ?? [],
+      });
+      if (c.transaction_history?.notes) {
+        await dataService.addNote(contact.id, c.transaction_history.notes);
       }
-    }
-
-    // If we couldn't save any clients and had errors, throw
-    if (savedCount === 0 && lastError && clients.length > 0) {
-      throw lastError;
     }
   },
 

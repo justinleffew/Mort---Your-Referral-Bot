@@ -353,6 +353,10 @@ const CommuteMode: React.FC = () => {
             navigate('/');
         } catch (error) {
             console.error('Failed to save brain dump', error);
+            if (error instanceof Error && error.message === AUTH_REQUIRED_MESSAGE) {
+                setSaveError(AUTH_REQUIRED_MESSAGE);
+                return;
+            }
             setSaveError('Save failed. Please retry.');
         } finally {
             setIsProcessing(false);
