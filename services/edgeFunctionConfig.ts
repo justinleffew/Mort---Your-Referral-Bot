@@ -3,6 +3,7 @@ export const EDGE_FUNCTIONS = {
   OPENAI_TTS: 'mort-openai-tts',
   RUN_NOW: 'mort-run-now',
   NEWS_SEARCH: 'mort-news-search',
+  OPENAI_REALTIME_SESSION: 'mort-openai-realtime-session',
 } as const;
 
 export const EDGE_FUNCTION_PATHS = {
@@ -10,4 +11,5 @@ export const EDGE_FUNCTION_PATHS = {
   OPENAI_TTS: '/functions/v1/mort-openai-tts',
   RUN_NOW: '/functions/v1/mort-run-now',
   NEWS_SEARCH: '/functions/v1/mort-news-search',
+  OPENAI_REALTIME_SESSION: '/functions/v1/mort-openai-realtime-session',
 } as const;
