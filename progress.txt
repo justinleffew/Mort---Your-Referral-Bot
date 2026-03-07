@@ -595,3 +595,36 @@
   - Gotchas
     - None.
 ---
+## 2026-03-07 00:00 - ADHOC-REALTIME-VOICE-CAPTURE
+- What was implemented
+  - Replaced Commute Mode's browser SpeechRecognition + one-shot follow-up flow with a continuous OpenAI Realtime WebRTC session manager.
+  - Added a centralized realtime voice service that manages auth, session lifecycle, VAD turn handling, interruption (barge-in), reconnect, transcript events, tool-driven draft updates, and save/finalize behavior.
+  - Added a new Supabase edge function to mint OpenAI Realtime ephemeral sessions and wired frontend config to call it.
+  - Updated Commute Mode UI to be voice-first with explicit listening/thinking/speaking states, live partial transcript rendering, and realtime structured draft field updates.
+- Files changed
+  - components/CommuteMode.tsx
+  - services/realtimeVoiceService.ts
+  - services/edgeFunctionConfig.ts
+  - supabase/functions/mort-openai-realtime-session/index.ts
+  - supabase/functions/mort-openai-realtime-session/config.toml
+- Assumptions made (if any)
+  - Assumed OpenAI Realtime session creation endpoint (`/v1/realtime/sessions`) is available from the deployed environment and uses server key + ephemeral client secret.
+  - Assumed minimum viable contact should default to at least one of full_name/phone/email unless explicitly overridden later.
+  - Assumed mapping non-schema fields (company/source/relationship/follow-up reason) into notes is acceptable for current DB schema.
+  - Assumed Commute Mode route remains `/commute` and should remain an authenticated flow via existing edge invoke auth checks.
+- Uncertainties and resolutions
+  - Unsure whether to keep legacy follow-up generation/TTS loop in place; resolved by replacing it entirely in Commute Mode to avoid mixed one-shot and realtime pipelines.
+  - Unsure where to centralize lifecycle (mic, RTC, data channel, parsing); resolved by creating `services/realtimeVoiceService.ts` and keeping UI component focused on rendering + user controls.
+  - Unsure how to satisfy deterministic extraction; resolved with explicit function tools (`update_contact_draft`, `finalize_contact`) and deterministic local field merges.
+  - Unsure how to support save timing; resolved with explicit save button + assistant-triggered finalize tool, both gated by minimum field checks.
+  - Unsure whether to block speech during assistant output; resolved by sending `response.cancel` on `speech_started` to support barge-in.
+- Tests / checks run (and results)
+  - npx tsc --noEmit (pass)
+  - npm run build (pass)
+  - Browser screenshot capture via Playwright (pass)
+- Learnings for future iterations:
+  - Patterns discovered
+    - WebRTC + data channel events cleanly separate realtime transport concerns from React rendering concerns.
+  - Gotchas
+    - Ephemeral session minting must live server-side; client cannot safely use persistent OpenAI API keys.
+---

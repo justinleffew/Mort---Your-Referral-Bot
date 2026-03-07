@@ -1,579 +1,213 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AUTH_REQUIRED_MESSAGE, generateBrainDumpFollowUps, generateSpeechAudio, processBrainDump } from '../services/openaiService';
-import { dataService } from '../services/dataService';
-import { getSupabaseClient } from '../services/supabaseClient';
 import { UI_LABELS } from '../utils/uiLabels';
+import {
+  ContactDraft,
+  formatPhoneDisplay,
+  getEmptyDraft,
+  RealtimeVoiceSession,
+  TranscriptEntry,
+  VoiceUiState,
+} from '../services/realtimeVoiceService';
+
+const statusCopy: Record<VoiceUiState, string> = {
+  idle: 'Tap to speak',
+  connecting: 'Connecting',
+  listening: 'Listening',
+  thinking: 'Thinking',
+  speaking: 'Speaking',
+  error: 'Error',
+};
 
 const CommuteMode: React.FC = () => {
-    const [isRecording, setIsRecording] = useState(false);
-    const [transcript, setTranscript] = useState('');
-    const [conversationTranscript, setConversationTranscript] = useState('');
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [speechSupported, setSpeechSupported] = useState(true);
-    const [speechError, setSpeechError] = useState('');
-    const [showManualEntry, setShowManualEntry] = useState(false);
-    const [followUpResponse, setFollowUpResponse] = useState('');
-    const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
-    const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
-    const [expandedFollowUps, setExpandedFollowUps] = useState<Record<string, boolean>>({});
-    const [submittedFollowUps, setSubmittedFollowUps] = useState<Record<string, boolean>>({});
-    const [hideFollowUpQuestions, setHideFollowUpQuestions] = useState(false);
-    const [isRefining, setIsRefining] = useState(false);
-    const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
-    const [selectedVoice, setSelectedVoice] = useState<'alloy' | 'nova'>('nova');
-    const [ttsError, setTtsError] = useState('');
-    const [voiceAuthMessage, setVoiceAuthMessage] = useState('');
-    const [isTtsLoading, setIsTtsLoading] = useState(false);
-    const [audioUrl, setAudioUrl] = useState<string | null>(null);
-    const [saveError, setSaveError] = useState('');
-    const recognitionRef = useRef<any>(null);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-    const followUpTimeoutRef = useRef<number | null>(null);
-    const silenceTimeoutRef = useRef<number | null>(null);
-    const speechStartRef = useRef<number | null>(null);
-    const latestTranscriptRef = useRef<string>('');
-    const isRecordingRef = useRef(false);
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const sessionRef = useRef<RealtimeVoiceSession | null>(null);
+  const [voiceState, setVoiceState] = useState<VoiceUiState>('idle');
+  const [statusDetail, setStatusDetail] = useState('');
+  const [draft, setDraft] = useState<ContactDraft>(getEmptyDraft());
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [partialUser, setPartialUser] = useState('');
+  const [partialAssistant, setPartialAssistant] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
-    useEffect(() => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            setSpeechSupported(false);
-            setShowManualEntry(true);
-            return;
+  const hasMinimum = useMemo(
+    () => Boolean(draft.full_name || draft.phone || draft.email),
+    [draft.email, draft.full_name, draft.phone],
+  );
+
+  useEffect(() => {
+    const session = new RealtimeVoiceSession({
+      onStateChange: (state, detail) => {
+        setVoiceState(state);
+        setStatusDetail(detail ?? '');
+      },
+      onDraftChange: setDraft,
+      onSessionStatus: setStatusDetail,
+      onTranscript: (entry) => {
+        if (entry.partial && entry.role === 'user') {
+          setPartialUser((prev) => prev + entry.text);
+          return;
+        }
+        if (entry.partial && entry.role === 'assistant') {
+          setPartialAssistant((prev) => prev + entry.text);
+          return;
         }
 
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-
-        recognitionRef.current.onresult = (event: any) => {
-            let current = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                current += event.results[i][0].transcript;
-            }
-            const trimmed = current.trim();
-            setTranscript(trimmed);
-            latestTranscriptRef.current = trimmed;
-            if (!speechStartRef.current) {
-                speechStartRef.current = Date.now();
-            }
-            scheduleSilenceStop();
-        };
-
-        recognitionRef.current.onerror = (event: any) => {
-            setSpeechError(event?.error ? `Speech recognition error: ${event.error}.` : 'Speech recognition encountered an error.');
-        };
-
-        recognitionRef.current.onnomatch = () => {
-            setSpeechError('No speech could be recognized. Try again or use manual entry.');
-        };
-
-        recognitionRef.current.onend = () => {
-            if (isRecordingRef.current) {
-                setIsRecording(false);
-            }
-            clearSilenceTimeout();
-        };
-    }, []);
-
-    const appendToConversation = (newTranscript: string) => {
-        const trimmedTranscript = newTranscript.trim();
-        if (!trimmedTranscript) {
-            return;
+        if (entry.role === 'user') {
+          setPartialUser('');
         }
-        setConversationTranscript((prev) => (prev ? `${prev}\n${trimmedTranscript}` : trimmedTranscript));
+        if (entry.role === 'assistant') {
+          setPartialAssistant('');
+        }
+        setTranscript((prev) => [...prev.slice(-24), entry]);
+      },
+    });
+    sessionRef.current = session;
+
+    return () => {
+      session.cleanup();
+      sessionRef.current = null;
     };
+  }, []);
 
-    const clearSilenceTimeout = () => {
-        if (silenceTimeoutRef.current !== null) {
-            window.clearTimeout(silenceTimeoutRef.current);
-            silenceTimeoutRef.current = null;
-        }
-    };
+  const handleToggleVoice = async () => {
+    setSaveMessage('');
+    if (!sessionRef.current) {
+      return;
+    }
 
-    const scheduleSilenceStop = () => {
-        if (!isRecordingRef.current) {
-            return;
-        }
-        clearSilenceTimeout();
-        const elapsed = speechStartRef.current ? Date.now() - speechStartRef.current : 0;
-        const delay = elapsed > 8000 ? 2000 : 1200;
-        silenceTimeoutRef.current = window.setTimeout(() => {
-            const finalTranscript = latestTranscriptRef.current.trim();
-            if (finalTranscript) {
-                stopRecording(finalTranscript);
-            }
-        }, delay);
-    };
+    if (voiceState === 'idle' || voiceState === 'error') {
+      await sessionRef.current.start();
+      return;
+    }
 
-    const stopRecording = (finalTranscript: string) => {
-        clearSilenceTimeout();
-        recognitionRef.current?.stop();
-        setIsRecording(false);
-        appendToConversation(finalTranscript);
-    };
+    await sessionRef.current.stop();
+  };
 
-    const startRecording = () => {
-        if (!speechSupported) {
-            return;
-        }
-        if (isRecordingRef.current) {
-            return;
-        }
-        if (hideFollowUpQuestions) {
-            setHideFollowUpQuestions(false);
-        }
-        const isFollowUpCycle = conversationTranscript.trim().length > 0 && (followUpQuestions.length > 0 || followUpResponse || isRefining);
-        setTranscript('');
-        latestTranscriptRef.current = '';
-        speechStartRef.current = Date.now();
-        if (!isFollowUpCycle) {
-            setConversationTranscript('');
-            setFollowUpResponse('');
-            setFollowUpQuestions([]);
-            setFollowUpAnswers({});
-            setExpandedFollowUps({});
-            setSubmittedFollowUps({});
-            setHideFollowUpQuestions(false);
-            setIsRefining(false);
-        }
-        setSpeechError('');
-        if (followUpTimeoutRef.current !== null) {
-            window.clearTimeout(followUpTimeoutRef.current);
-            followUpTimeoutRef.current = null;
-        }
-        recognitionRef.current?.start();
-        setIsRecording(true);
-    };
+  const handleSave = async () => {
+    if (!sessionRef.current || !hasMinimum || isSaving) {
+      return;
+    }
+    setSaveMessage('');
+    setIsSaving(true);
+    try {
+      const saved = await sessionRef.current.saveDraft();
+      setSaveMessage(saved ? 'Contact saved.' : 'Need a name, phone, or email before saving.');
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : 'Failed to save contact.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    useEffect(() => {
-        if (!conversationTranscript.trim()) {
-            setFollowUpResponse('');
-            setFollowUpQuestions([]);
-            setHideFollowUpQuestions(false);
-            return;
-        }
-        if (hideFollowUpQuestions) {
-            return;
-        }
-
-        const delay = conversationTranscript.length > 240 ? 1600 : 1200;
-        const timeout = window.setTimeout(async () => {
-            setIsRefining(true);
-            const followUp = await generateBrainDumpFollowUps(conversationTranscript);
-            setFollowUpResponse(followUp.response);
-            setFollowUpQuestions(followUp.questions);
-            setIsRefining(false);
-        }, delay);
-        followUpTimeoutRef.current = timeout;
-
-        return () => {
-            window.clearTimeout(timeout);
-            if (followUpTimeoutRef.current === timeout) {
-                followUpTimeoutRef.current = null;
-            }
-        };
-    }, [conversationTranscript]);
-
-    useEffect(() => {
-        setFollowUpAnswers({});
-        setExpandedFollowUps({});
-        setSubmittedFollowUps({});
-    }, [followUpQuestions]);
-
-    const handleFollowUpToggle = (question: string) => {
-        setExpandedFollowUps((prev) => ({
-            ...prev,
-            [question]: !prev[question]
-        }));
-    };
-
-    const handleFollowUpAnswerChange = (question: string, value: string) => {
-        setFollowUpAnswers((prev) => ({
-            ...prev,
-            [question]: value
-        }));
-        setSubmittedFollowUps((prev) => ({
-            ...prev,
-            [question]: false
-        }));
-    };
-
-    const handleSubmitFollowUps = () => {
-        const allAnswered = followUpQuestions.every((question) => followUpAnswers[question]?.trim());
-        if (!allAnswered) {
-            return;
-        }
-        const combinedAnswers = followUpQuestions
-            .map((question) => {
-                const answer = followUpAnswers[question]?.trim();
-                return answer ? `${question} ${answer}` : '';
-            })
-            .filter(Boolean)
-            .join('\n');
-        appendToConversation(combinedAnswers);
-        setSubmittedFollowUps(() => {
-            const next: Record<string, boolean> = {};
-            followUpQuestions.forEach((question) => {
-                next[question] = true;
-            });
-            return next;
-        });
-        setExpandedFollowUps({});
-        setHideFollowUpQuestions(true);
-    };
-
-    useEffect(() => {
-        let active = true;
-        const checkVoiceAuth = async () => {
-            const supabase = getSupabaseClient();
-            if (!supabase) {
-                if (active) {
-                    setIsVoiceEnabled(false);
-                    // Don't show intrusive message - voice is just quietly disabled
-                }
-                return;
-            }
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-            if (!active) {
-                return;
-            }
-            if (sessionError || !sessionData?.session) {
-                setIsVoiceEnabled(false);
-                // Voice is disabled but we don't show a blocking message
-                // The user can still use all other features
-                return;
-            }
-            setVoiceAuthMessage('');
-        };
-
-        checkVoiceAuth();
-
-        return () => {
-            active = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!isVoiceEnabled) {
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.currentTime = 0;
-            }
-            return;
-        }
-
-        if (isRecording) {
-            return;
-        }
-
-        if (!followUpResponse.trim()) {
-            setAudioUrl(null);
-            return;
-        }
-
-        let cancelled = false;
-        const fetchAudio = async () => {
-            setIsTtsLoading(true);
-            setTtsError('');
-            try {
-                const supabase = getSupabaseClient();
-                if (!supabase) {
-                    setIsVoiceEnabled(false);
-                    setAudioUrl(null);
-                    return;
-                }
-                const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError || !sessionData?.session) {
-                    setIsVoiceEnabled(false);
-                    setAudioUrl(null);
-                    return;
-                }
-                const { audio, mimeType } = await generateSpeechAudio(followUpResponse, selectedVoice);
-                if (cancelled) return;
-                const binary = atob(audio);
-                const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-                const blob = new Blob([bytes], { type: mimeType || 'audio/mpeg' });
-                const url = URL.createObjectURL(blob);
-                setAudioUrl(url);
-            } catch (error) {
-                if (cancelled) return;
-                console.warn('TTS unavailable:', error instanceof Error ? error.message : error);
-                // Don't show error for auth issues - voice is just disabled
-                // Only show error for unexpected failures
-                const isAuthError = error instanceof Error &&
-                    (error.message.includes('sign in') || error.message.includes('Unauthorized') || error.message.includes('401'));
-                if (!isAuthError) {
-                    setTtsError('Voice playback unavailable.');
-                }
-                setAudioUrl(null);
-            } finally {
-                if (!cancelled) {
-                    setIsTtsLoading(false);
-                }
-            }
-        };
-
-        fetchAudio();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [followUpResponse, isVoiceEnabled, selectedVoice, isRecording]);
-
-    useEffect(() => {
-        if (!audioUrl) {
-            return;
-        }
-
-        const audio = audioRef.current;
-        if (audio) {
-            const handleCanPlay = () => {
-                audio.play().catch((error) => {
-                    console.error('Audio playback failed', error);
-                    setTtsError('Audio playback was blocked. Showing text only.');
-                });
-            };
-            audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
-            audio.src = audioUrl;
-            audio.load();
-
-            return () => {
-                audio.removeEventListener('canplaythrough', handleCanPlay);
-                URL.revokeObjectURL(audioUrl);
-            };
-        }
-
-        return () => {
-            URL.revokeObjectURL(audioUrl);
-        };
-    }, [audioUrl]);
-
-    const handleProcess = async () => {
-        const combinedTranscript = conversationTranscript.trim() || transcript.trim();
-        if (!combinedTranscript) return;
-        setSaveError('');
-        setIsProcessing(true);
-        try {
-            const clients = await processBrainDump(combinedTranscript);
-            await dataService.addBrainDumpClients(clients);
-            navigate('/');
-        } catch (error) {
-            console.error('Failed to save brain dump', error);
-            if (error instanceof Error && error.message === AUTH_REQUIRED_MESSAGE) {
-                setSaveError(AUTH_REQUIRED_MESSAGE);
-                return;
-            }
-            setSaveError('Save failed. Please retry.');
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    useEffect(() => {
-        isRecordingRef.current = isRecording;
-    }, [isRecording]);
-
-    return (
-        <div className="min-h-screen bg-app z-[100] flex flex-col p-8 items-center justify-between animate-in fade-in duration-500 overflow-y-auto">
-            {/* Header */}
-            <div className="w-full flex justify-between items-center pt-4">
-                <button onClick={() => navigate('/')} className="text-muted-foreground font-black uppercase text-xs tracking-widest border border-border px-6 py-3 rounded-full hover:bg-secondary/60">
-                    Exit
-                </button>
-                <div className="flex flex-col items-end">
-                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Commute Mode</span>
-                    <span className="text-foreground font-bold text-sm">{UI_LABELS.ingestion} Active</span>
-                </div>
-            </div>
-
-            {/* Main Central Mic Area */}
-            <div className="flex-1 flex flex-col items-center justify-center w-full gap-12">
-                <div className="text-center space-y-4 max-w-xs">
-                    <h2 className="text-4xl font-black text-foreground leading-tight">Client Brain Dump</h2>
-                    <p className="text-muted-foreground text-lg font-medium">Just talk. Tell me who they are, when they bought, and what they love.</p>
-                </div>
-
-                <button 
-                    onClick={startRecording}
-                    disabled={!speechSupported}
-                    className={`w-56 h-56 rounded-full flex items-center justify-center transition-all duration-700 relative ${isRecording ? 'bg-primary shadow-[0_0_80px_rgba(37,99,235,0.35)]' : 'bg-surface border-4 border-border'} ${speechSupported ? '' : 'opacity-40 cursor-not-allowed'}`}
-                >
-                    {isRecording && (
-                        <>
-                            <div className="absolute inset-0 rounded-full animate-ping bg-primary opacity-20"></div>
-                            <div className="absolute -inset-8 rounded-full animate-pulse bg-primary opacity-10"></div>
-                        </>
-                    )}
-                    <svg className={`w-24 h-24 ${isRecording ? 'text-white' : 'text-muted-foreground'}`} fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                    </svg>
-                </button>
-
-                {!speechSupported && (
-                    <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-center text-sm text-rose-700">
-                        Speech recognition isn’t supported in this browser. Use manual entry below to continue.
-                    </div>
-                )}
-
-                {speechError && (
-                    <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-center text-sm text-amber-700">
-                        {speechError}
-                    </div>
-                )}
-
-                <div className={`w-full max-w-md bg-muted border border-border rounded-[2rem] p-6 h-32 overflow-y-auto transition-opacity ${transcript ? 'opacity-100' : 'opacity-40'}`}>
-                    <p className="text-foreground text-center font-medium leading-relaxed italic">
-                        {transcript || "Speak clearly... I'm listening for names, dates, and interests."}
-                    </p>
-                </div>
-
-                {(isRefining || followUpQuestions.length > 0 || followUpResponse) && (
-                    <div className="w-full max-w-md rounded-[2rem] border border-border bg-surface px-6 py-5 text-sm text-foreground">
-                        <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-foreground">
-                            <span>Assistant Response</span>
-                            <div className="flex items-center gap-3">
-                                {isRecording && conversationTranscript.trim() && (
-                                    <span className="text-muted-foreground">Listening for follow-up answers…</span>
-                                )}
-                                {!isRecording && isRefining && <span className="text-muted-foreground">Listening…</span>}
-                                {isTtsLoading && <span className="text-muted-foreground">Generating audio…</span>}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsVoiceEnabled((prev) => !prev)}
-                                    disabled={!!voiceAuthMessage}
-                                    className={`rounded-full border border-primary/40 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary transition hover:bg-secondary ${voiceAuthMessage ? 'cursor-not-allowed opacity-60' : ''}`}
-                                >
-                                    {isVoiceEnabled ? 'Voice On' : 'Voice Muted'}
-                                </button>
-                                <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                                    Voice
-                                    <select
-                                        value={selectedVoice}
-                                        onChange={(event) => setSelectedVoice(event.target.value as 'alloy' | 'nova')}
-                                        disabled={!!voiceAuthMessage}
-                                        className={`rounded-full border border-primary/40 bg-muted px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary ${voiceAuthMessage ? 'cursor-not-allowed opacity-60' : ''}`}
-                                    >
-                                        <option value="alloy">Alloy</option>
-                                        <option value="nova">Nova</option>
-                                    </select>
-                                </label>
-                            </div>
-                        </div>
-                        {voiceAuthMessage && (
-                            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                                {voiceAuthMessage}
-                            </div>
-                        )}
-                        {ttsError && (
-                            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                                {ttsError}
-                            </div>
-                        )}
-                        <audio ref={audioRef} className="hidden" />
-                        <p className="mt-3 text-muted-foreground">
-                            {followUpResponse || 'Tell me specific details so I can trigger real-time moments.'}
-                        </p>
-                        {followUpQuestions.length > 0 && !hideFollowUpQuestions && (
-                            <div className="mt-3 space-y-3">
-                                <ul className="space-y-2 text-foreground">
-                                    {followUpQuestions.map((question) => {
-                                        const isExpanded = expandedFollowUps[question];
-                                        const answer = followUpAnswers[question] ?? '';
-                                        const isSubmitted = submittedFollowUps[question];
-                                        return (
-                                            <li key={question} className="space-y-2 rounded-2xl bg-muted px-4 py-2 text-sm font-semibold">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleFollowUpToggle(question)}
-                                                    className="flex w-full items-center justify-between gap-3 text-left"
-                                                >
-                                                    <span>{question}</span>
-                                                    {isSubmitted && (
-                                                        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400 bg-emerald-50 text-emerald-600">
-                                                            <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                                                <path
-                                                                    fillRule="evenodd"
-                                                                    d="M16.704 5.296a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3.25-3.25a1 1 0 011.414-1.414L9.75 11.586l6.543-6.54a1 1 0 011.411-.01z"
-                                                                    clipRule="evenodd"
-                                                                />
-                                                            </svg>
-                                                        </span>
-                                                    )}
-                                                </button>
-                                                {isExpanded && (
-                                                    <textarea
-                                                        value={answer}
-                                                        onChange={(event) => handleFollowUpAnswerChange(question, event.target.value)}
-                                                        rows={3}
-                                                        className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-medium text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                                        placeholder="Type your answer..."
-                                                    />
-                                                )}
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                                <button
-                                    type="button"
-                                    onClick={handleSubmitFollowUps}
-                                    disabled={!followUpQuestions.every((question) => followUpAnswers[question]?.trim())}
-                                    className={`w-full rounded-2xl border border-border px-4 py-3 text-xs font-black uppercase tracking-[0.3em] transition ${followUpQuestions.every((question) => followUpAnswers[question]?.trim()) ? 'bg-primary text-white hover:opacity-90' : 'bg-muted text-muted-foreground opacity-60 cursor-not-allowed'}`}
-                                >
-                                    Submit Answers
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {!speechSupported && (
-                    <button
-                        type="button"
-                        onClick={() => setShowManualEntry(true)}
-                        className="text-xs font-bold uppercase tracking-[0.2em] text-primary hover:text-primary/80"
-                    >
-                        Use Manual Entry
-                    </button>
-                )}
-
-                {showManualEntry && (
-                    <div className="w-full max-w-md">
-                        <label className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                            Manual Entry
-                        </label>
-                        <textarea
-                            value={transcript}
-                            onChange={(event) => setTranscript(event.target.value)}
-                            rows={5}
-                            className="mt-3 w-full rounded-2xl border border-border bg-muted p-4 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                            placeholder="Type the client details you would have spoken..."
-                        />
-                    </div>
-                )}
-            </div>
-
-            {/* Action Bar */}
-            <div className="w-full pb-8 flex flex-col gap-4">
-                {saveError && (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700 text-center">
-                        {saveError}
-                    </div>
-                )}
-                <button
-                    disabled={(!transcript && !conversationTranscript) || isProcessing}
-                    onClick={handleProcess}
-                    className={`w-full py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-xl transition-all shadow-2xl ${(transcript || conversationTranscript) && !isProcessing ? 'bg-primary text-white active:scale-95' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
-                >
-                    {isProcessing ? "Processing Voice Memo..." : `Save to ${UI_LABELS.radar}`}
-                </button>
-            </div>
+  return (
+    <div className="min-h-screen bg-app z-[100] flex flex-col p-6 md:p-8 items-center gap-6 overflow-y-auto">
+      <div className="w-full max-w-5xl flex justify-between items-center pt-2">
+        <button onClick={() => navigate('/')} className="text-muted-foreground font-black uppercase text-xs tracking-widest border border-border px-5 py-2 rounded-full hover:bg-secondary/60">
+          Exit
+        </button>
+        <div className="text-right">
+          <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Voice Capture</span>
+          <p className="text-foreground font-bold text-sm">{UI_LABELS.ingestion} Realtime</p>
         </div>
-    );
+      </div>
+
+      <div className="w-full max-w-5xl grid gap-5 lg:grid-cols-[1.2fr_1fr]">
+        <div className="rounded-3xl border border-border bg-surface p-6 md:p-8 space-y-6">
+          <div className="text-center space-y-3">
+            <h2 className="text-3xl font-black text-foreground">Contact Voice Mode</h2>
+            <p className="text-muted-foreground font-medium">Brain dump naturally. Mort keeps listening until you stop.</p>
+          </div>
+
+          <div className="flex flex-col items-center gap-4">
+            <button
+              type="button"
+              onClick={handleToggleVoice}
+              className={`w-48 h-48 rounded-full flex items-center justify-center transition-all duration-500 relative ${voiceState === 'listening' ? 'bg-primary shadow-[0_0_80px_rgba(37,99,235,0.35)] text-white' : 'bg-muted border-4 border-border text-foreground'}`}
+            >
+              <svg className="w-20 h-20" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+              </svg>
+            </button>
+            <div className="text-center">
+              <p className="text-xs font-black uppercase tracking-[0.3em] text-primary">{statusCopy[voiceState]}</p>
+              <p className="text-sm text-muted-foreground mt-1">{statusDetail || 'Open voice mode and start talking.'}</p>
+              <p className="text-xs text-muted-foreground mt-1">{voiceState === 'idle' ? 'Tap to speak' : 'Tap to stop'}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-black uppercase tracking-[0.25em] text-muted-foreground">Live Transcript</h3>
+            <div className="rounded-2xl border border-border bg-muted p-4 h-72 overflow-y-auto space-y-3">
+              {transcript.map((entry) => (
+                <div key={entry.id} className={`text-sm ${entry.role === 'assistant' ? 'text-primary font-semibold' : 'text-foreground'}`}>
+                  <span className="mr-2 text-[10px] uppercase tracking-widest opacity-70">{entry.role}</span>
+                  {entry.text}
+                </div>
+              ))}
+              {partialUser && (
+                <div className="text-sm text-foreground italic">
+                  <span className="mr-2 text-[10px] uppercase tracking-widest opacity-70">user</span>
+                  {partialUser}
+                </div>
+              )}
+              {partialAssistant && (
+                <div className="text-sm text-primary font-semibold italic">
+                  <span className="mr-2 text-[10px] uppercase tracking-widest opacity-70">assistant</span>
+                  {partialAssistant}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-border bg-surface p-6 md:p-7 space-y-4">
+          <h3 className="text-xs font-black uppercase tracking-[0.25em] text-muted-foreground">Contact Draft (Realtime)</h3>
+          <div className="grid grid-cols-1 gap-3 text-sm">
+            <DraftRow label="Full name" value={draft.full_name} />
+            <DraftRow label="Phone" value={formatPhoneDisplay(draft.phone)} />
+            <DraftRow label="Email" value={draft.email} />
+            <DraftRow label="Company" value={draft.company} />
+            <DraftRow label="City" value={draft.city} />
+            <DraftRow label="Tags" value={draft.tags.join(', ')} />
+            <DraftRow label="Interests" value={draft.interests.join(', ')} />
+            <DraftRow label="Relationship" value={draft.relationship_context} />
+            <DraftRow label="Source" value={draft.source} />
+            <DraftRow label="Follow-up reason" value={draft.follow_up_reason} />
+            <DraftRow label="Notes" value={draft.notes} multiline />
+          </div>
+
+          <div className="rounded-2xl border border-border bg-muted p-3 text-xs text-muted-foreground">
+            Save is enabled once at least one field exists: full name, phone, or email.
+          </div>
+
+          {saveMessage && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
+              {saveMessage}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!hasMinimum || isSaving}
+            className={`w-full py-4 rounded-2xl text-xs font-black uppercase tracking-[0.25em] transition ${hasMinimum && !isSaving ? 'bg-primary text-white hover:opacity-90' : 'bg-muted text-muted-foreground opacity-60 cursor-not-allowed'}`}
+          >
+            {isSaving ? 'Saving…' : `Save to ${UI_LABELS.radar}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
+
+const DraftRow = ({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) => (
+  <div className="rounded-2xl border border-border bg-muted px-3 py-2">
+    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+    <p className={`${multiline ? 'whitespace-pre-wrap min-h-10' : ''} mt-1 text-foreground font-medium`}>{value || '—'}</p>
+  </div>
+);
 
 export default CommuteMode;
